@@ -9,31 +9,37 @@
   <style>
     body { font-family: 'Noto Sans KR', sans-serif; }
     
-    /* 테이블 틀고정 스타일 */
+    /* 1. 테이블 컨테이너 설정 */
     .table-container {
       max-height: 600px;
       overflow: auto;
+      position: relative;
     }
+    
+    /* 2. 전체 테이블 헤더 상단 틀고정 (Sticky Top) */
     .table-container table {
       border-separate: 0;
+      width: 100%;
     }
     .table-container thead th {
       position: sticky;
       top: 0;
       z-index: 20;
+      background-color: #334155 !important; /* bg-slate-700 색상 유지 */
+      color: #ffffff;
+      box-shadow: inset 0 -1px 0 #475569; /* 스크롤 시 헤더 구분선 유지 */
     }
     
-    /* 좌측 열 고정 (Sticky Left Columns) */
+    /* 3. 좌측 주요 열 3개 상단+좌측 이중 고정 (Sticky Left + Top) */
     .sticky-col-1 { position: sticky; left: 0; z-index: 10; background-color: #ffffff; }
     .sticky-col-2 { position: sticky; left: 70px; z-index: 10; background-color: #ffffff; }
     .sticky-col-3 { position: sticky; left: 180px; z-index: 10; background-color: #ffffff; }
     
-    /* 헤더 sticky 순서 맞춤 */
+    /* 좌측 고정 열의 헤더 교차점 z-index 최상위(30) 교정 */
     thead th.sticky-col-1,
     thead th.sticky-col-2,
     thead th.sticky-col-3 {
       z-index: 30 !important;
-      background-color: #334155 !important; /* bg-slate-700 */
     }
   </style>
 </head>
@@ -108,22 +114,22 @@
       </div>
     </div>
 
-    <!-- 3. 예약 현황 테이블 -->
+    <!-- 3. 예약 현황 테이블 (헤더 전체 상단 고정) -->
     <div class="bg-white rounded-lg shadow overflow-hidden border border-gray-200">
       <div class="table-container">
         <table class="w-full text-xs text-left text-gray-600 border-collapse">
-          <thead class="bg-slate-700 text-white uppercase text-[11px] tracking-wider">
+          <thead class="bg-slate-700 uppercase text-[11px] tracking-wider">
             <tr>
-              <th class="p-2.5 text-center border-b border-slate-600 sticky-col-1 w-[70px]">상태</th>
-              <th class="p-2.5 border-b border-slate-600 sticky-col-2 w-[110px]">체크인/아웃</th>
-              <th class="p-2.5 border-b border-slate-600 sticky-col-3 w-[100px]">예약자명</th>
-              <th class="p-2.5 text-center border-b border-slate-600 min-w-[80px]">인원/객실</th>
-              <th class="p-2.5 border-b border-slate-600 min-w-[160px]">송영버스(IN/OUT)</th>
-              <th class="p-2.5 border-b border-slate-600 min-w-[140px]">항공편(IN/OUT)</th>
-              <th class="p-2.5 border-b border-slate-600 min-w-[90px]">방배정</th>
-              <th class="p-2.5 border-b border-slate-600 min-w-[120px]">메모</th>
-              <th class="p-2.5 border-b border-slate-600 min-w-[120px]">호텔 메모</th>
-              <th class="p-2.5 text-center border-b border-slate-600 min-w-[90px]">관리</th>
+              <th class="p-2.5 text-center sticky-col-1 w-[70px]">상태</th>
+              <th class="p-2.5 sticky-col-2 w-[110px]">체크인/아웃</th>
+              <th class="p-2.5 sticky-col-3 w-[100px]">예약자명</th>
+              <th class="p-2.5 text-center min-w-[80px]">인원/객실</th>
+              <th class="p-2.5 min-w-[160px]">송영버스(IN/OUT)</th>
+              <th class="p-2.5 min-w-[140px]">항공편(IN/OUT)</th>
+              <th class="p-2.5 min-w-[90px]">방배정</th>
+              <th class="p-2.5 min-w-[120px]">메모</th>
+              <th class="p-2.5 min-w-[120px]">호텔 메모</th>
+              <th class="p-2.5 text-center min-w-[90px]">관리</th>
             </tr>
           </thead>
           <tbody id="reservationTableBody" class="divide-y divide-gray-200">
@@ -657,7 +663,8 @@
         }
       } catch (err) {
         alert('오류 발생: ' + err.message);
-      } finally {
+      } font-medium
+      finally {
         const btn = document.getElementById('btnSubmit');
         btn.disabled = false;
         btn.innerText = '저장하기';
