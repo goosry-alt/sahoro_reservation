@@ -8,7 +8,33 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     body { font-family: 'Noto Sans KR', sans-serif; }
-    .table-fixed-header thead th { position: sticky; top: 0; z-index: 10; }
+    
+    /* 테이블 틀고정 스타일 */
+    .table-container {
+      max-height: 600px;
+      overflow: auto;
+    }
+    .table-container table {
+      border-separate: 0;
+    }
+    .table-container thead th {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+    }
+    
+    /* 좌측 열 고정 (Sticky Left Columns) */
+    .sticky-col-1 { position: sticky; left: 0; z-index: 10; background-color: #ffffff; }
+    .sticky-col-2 { position: sticky; left: 70px; z-index: 10; background-color: #ffffff; }
+    .sticky-col-3 { position: sticky; left: 180px; z-index: 10; background-color: #ffffff; }
+    
+    /* 헤더 sticky 순서 맞춤 */
+    thead th.sticky-col-1,
+    thead th.sticky-col-2,
+    thead th.sticky-col-3 {
+      z-index: 30 !important;
+      background-color: #334155 !important; /* bg-slate-700 */
+    }
   </style>
 </head>
 <body class="bg-gray-100 min-h-screen text-gray-800">
@@ -17,7 +43,7 @@
   <header class="bg-slate-800 text-white shadow-md">
     <div class="max-w-7xl mx-auto px-4 py-4 flex flex-wrap justify-between items-center gap-4">
       <h1 class="text-xl font-bold flex items-center gap-2">
-        <i class="fa-solid me-1 fa-hotel"></i> 사호로리조트 예약현황 관리
+        <i class="fa-solid fa-hotel"></i> 사호로리조트 예약현황 관리
       </h1>
       
       <div class="flex items-center gap-2 flex-grow max-w-xl">
@@ -40,43 +66,64 @@
   </header>
 
   <!-- Main Content -->
-  <main class="max-w-7xl mx-auto px-4 py-6">
-    <!-- Status summary cards -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-      <div class="bg-white p-4 rounded-lg shadow border-l-4 border-blue-500">
-        <div class="text-gray-500 text-xs font-bold uppercase">전체 예약</div>
-        <div id="totalCount" class="text-2xl font-bold mt-1">0건</div>
+  <main class="max-w-7xl mx-auto px-4 py-6 space-y-6">
+
+    <!-- 1. 동일 날짜 & 버스 이용 인원 자동 집계 현황 -->
+    <div class="bg-white rounded-lg shadow p-4 border border-gray-200">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="text-xs font-bold text-slate-700 uppercase flex items-center gap-1.5">
+          <i class="fa-solid fa-bus text-blue-600"></i> 동일 날짜/버스별 탑승 인원 현황
+        </h3>
+        <span class="text-[11px] text-gray-400">* 확정/신규/수정 상태의 인원만 자동 집계됩니다.</span>
       </div>
-      <div class="bg-white p-4 rounded-lg shadow border-l-4 border-emerald-500">
-        <div class="text-gray-500 text-xs font-bold uppercase">확정 (ACTIVE)</div>
-        <div id="activeCount" class="text-2xl font-bold mt-1 text-emerald-600">0건</div>
-      </div>
-      <div class="bg-white p-4 rounded-lg shadow border-l-4 border-amber-500">
-        <div class="text-gray-500 text-xs font-bold uppercase">대기 (WAITING)</div>
-        <div id="waitingCount" class="text-2xl font-bold mt-1 text-amber-600">0건</div>
-      </div>
-      <div class="bg-white p-4 rounded-lg shadow border-l-4 border-rose-500">
-        <div class="text-gray-500 text-xs font-bold uppercase">취소 (CANCELLED)</div>
-        <div id="cancelledCount" class="text-2xl font-bold mt-1 text-rose-600">0건</div>
+      
+      <div class="max-h-32 overflow-y-auto pr-1 border rounded bg-gray-50">
+        <div id="busSummaryList" class="p-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 text-xs">
+          <div class="col-span-full text-center text-gray-400 py-3">데이터를 불러오면 집계 정보가 표시됩니다.</div>
+        </div>
       </div>
     </div>
 
-    <!-- Table Container -->
-    <div class="bg-white rounded-lg shadow overflow-hidden">
-      <div class="overflow-x-auto max-h-[650px] table-fixed-header">
+    <!-- 2. 상태별 요약 카운터 -->
+    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+      <div class="bg-white p-3 rounded-lg shadow border-l-4 border-sky-500">
+        <div class="text-gray-500 text-[11px] font-bold">신규 (NEW)</div>
+        <div id="newCount" class="text-xl font-bold mt-0.5 text-sky-600">0건</div>
+      </div>
+      <div class="bg-white p-3 rounded-lg shadow border-l-4 border-emerald-500">
+        <div class="text-gray-500 text-[11px] font-bold">확정 (ACTIVE)</div>
+        <div id="activeCount" class="text-xl font-bold mt-0.5 text-emerald-600">0건</div>
+      </div>
+      <div class="bg-white p-3 rounded-lg shadow border-l-4 border-indigo-500">
+        <div class="text-gray-500 text-[11px] font-bold">수정 (UPDATED)</div>
+        <div id="updatedCount" class="text-xl font-bold mt-0.5 text-indigo-600">0건</div>
+      </div>
+      <div class="bg-white p-3 rounded-lg shadow border-l-4 border-amber-500">
+        <div class="text-gray-500 text-[11px] font-bold">대기 (WAITING)</div>
+        <div id="waitingCount" class="text-xl font-bold mt-0.5 text-amber-600">0건</div>
+      </div>
+      <div class="bg-white p-3 rounded-lg shadow border-l-4 border-rose-500">
+        <div class="text-gray-500 text-[11px] font-bold">취소 (CANCELLED)</div>
+        <div id="cancelledCount" class="text-xl font-bold mt-0.5 text-rose-600">0건</div>
+      </div>
+    </div>
+
+    <!-- 3. 예약 현황 테이블 -->
+    <div class="bg-white rounded-lg shadow overflow-hidden border border-gray-200">
+      <div class="table-container">
         <table class="w-full text-xs text-left text-gray-600 border-collapse">
           <thead class="bg-slate-700 text-white uppercase text-[11px] tracking-wider">
             <tr>
-              <th class="p-2 text-center border-b border-slate-600">상태</th>
-              <th class="p-2 border-b border-slate-600">체크인/아웃</th>
-              <th class="p-2 border-b border-slate-600">예약자명</th>
-              <th class="p-2 text-center border-b border-slate-600">인원/객실</th>
-              <th class="p-2 border-b border-slate-600">송영버스(IN/OUT)</th>
-              <th class="p-2 border-b border-slate-600">항공편(IN/OUT)</th>
-              <th class="p-2 border-b border-slate-600">방배정</th>
-              <th class="p-2 border-b border-slate-600">동행자 정보</th>
-              <th class="p-2 border-b border-slate-600">메모</th>
-              <th class="p-2 text-center border-b border-slate-600">관리</th>
+              <th class="p-2.5 text-center border-b border-slate-600 sticky-col-1 w-[70px]">상태</th>
+              <th class="p-2.5 border-b border-slate-600 sticky-col-2 w-[110px]">체크인/아웃</th>
+              <th class="p-2.5 border-b border-slate-600 sticky-col-3 w-[100px]">예약자명</th>
+              <th class="p-2.5 text-center border-b border-slate-600 min-w-[80px]">인원/객실</th>
+              <th class="p-2.5 border-b border-slate-600 min-w-[160px]">송영버스(IN/OUT)</th>
+              <th class="p-2.5 border-b border-slate-600 min-w-[140px]">항공편(IN/OUT)</th>
+              <th class="p-2.5 border-b border-slate-600 min-w-[90px]">방배정</th>
+              <th class="p-2.5 border-b border-slate-600 min-w-[120px]">메모</th>
+              <th class="p-2.5 border-b border-slate-600 min-w-[120px]">호텔 메모</th>
+              <th class="p-2.5 text-center border-b border-slate-600 min-w-[90px]">관리</th>
             </tr>
           </thead>
           <tbody id="reservationTableBody" class="divide-y divide-gray-200">
@@ -102,7 +149,7 @@
       <form id="resForm" onsubmit="handleFormSubmit(event)" class="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
         <input type="hidden" id="editIndex" value="-1">
 
-        <!-- 1. 기본 정보 -->
+        <!-- 기본 정보 -->
         <div>
           <h4 class="font-semibold text-gray-700 border-b pb-2 mb-3 text-sm flex items-center gap-2">
             <i class="fa-solid fa-user text-blue-600"></i> 기본 정보
@@ -110,8 +157,10 @@
           <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <label class="block text-xs font-bold text-gray-600 mb-1">상태</label>
-              <select id="formStatus" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+              <select id="formStatus" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500 font-medium">
+                <option value="NEW">신규 (NEW)</option>
                 <option value="ACTIVE">확정 (ACTIVE)</option>
+                <option value="UPDATED">수정 (UPDATED)</option>
                 <option value="WAITING">대기 (WAITING)</option>
                 <option value="CANCELLED">취소 (CANCELLED)</option>
               </select>
@@ -147,13 +196,12 @@
           </div>
         </div>
 
-        <!-- 2. 교통 및 일정 정보 -->
+        <!-- 교통 및 일정 정보 -->
         <div>
           <h4 class="font-semibold text-gray-700 border-b pb-2 mb-3 text-sm flex items-center gap-2">
             <i class="fa-solid fa-plane text-blue-600"></i> 교통 및 일정 정보
           </h4>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <!-- 버스 IN -->
             <div>
               <label class="block text-xs font-bold text-gray-600 mb-1">송영 버스 (IN)</label>
               <select id="formBusIn" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
@@ -163,7 +211,6 @@
                 <option value="OBIHIRO">OBIHIRO</option>
               </select>
             </div>
-            <!-- 버스 OUT -->
             <div>
               <label class="block text-xs font-bold text-gray-600 mb-1">송영 버스 (OUT)</label>
               <select id="formBusOut" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
@@ -173,7 +220,6 @@
                 <option value="OBIHIRO">OBIHIRO</option>
               </select>
             </div>
-            <!-- 항공편 IN -->
             <div>
               <label class="block text-xs font-bold text-gray-600 mb-1">항공편 (IN)</label>
               <select id="formFlightIn" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
@@ -201,7 +247,6 @@
                 <option value="RF356">RF356</option>
               </select>
             </div>
-            <!-- 항공편 OUT -->
             <div>
               <label class="block text-xs font-bold text-gray-600 mb-1">항공편 (OUT)</label>
               <select id="formFlightOut" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
@@ -232,7 +277,7 @@
           </div>
         </div>
 
-        <!-- 3. 방배정 및 메모 -->
+        <!-- 방배정 및 기타 -->
         <div>
           <h4 class="font-semibold text-gray-700 border-b pb-2 mb-3 text-sm flex items-center gap-2">
             <i class="fa-solid fa-bed text-blue-600"></i> 방배정 및 기타
@@ -240,7 +285,7 @@
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label class="block text-xs font-bold text-gray-600 mb-1">방배정</label>
-              <input type="text" id="formRoomAllocation" placeholder="예: 301호, 302호" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+              <input type="text" id="formRoomAllocation" placeholder="예: 301호" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
             </div>
             <div>
               <label class="block text-xs font-bold text-gray-600 mb-1">고객 메모</label>
@@ -253,7 +298,7 @@
           </div>
         </div>
 
-        <!-- 4. 동행인 정보 (성별 포함) -->
+        <!-- 동행인 명단 -->
         <div>
           <div class="flex justify-between items-center border-b pb-2 mb-3">
             <h4 class="font-semibold text-gray-700 text-sm flex items-center gap-2">
@@ -276,12 +321,12 @@
               </tr>
             </thead>
             <tbody id="companionTableBody" class="divide-y divide-gray-200">
-              <!-- 動的 Row 추가 영역 -->
+              <!-- 동적 생성 -->
             </tbody>
           </table>
         </div>
 
-        <!-- Submit Controls -->
+        <!-- Controls -->
         <div class="flex justify-end gap-2 pt-4 border-t">
           <button type="button" onclick="closeModal()" class="px-4 py-2 text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 rounded font-medium">취소</button>
           <button type="submit" id="btnSubmit" class="px-5 py-2 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded font-medium">저장하기</button>
@@ -290,7 +335,6 @@
     </div>
   </div>
 
-  <!-- JavaScript -->
   <script>
     let reservations = [];
 
@@ -332,6 +376,7 @@
           reservations = data;
           renderTable();
           updateSummary();
+          updateBusSummary();
         } else {
           alert('데이터 형식이 올바르지 않습니다.');
         }
@@ -341,10 +386,65 @@
     }
 
     function updateSummary() {
-      document.getElementById('totalCount').innerText = reservations.length + '건';
+      document.getElementById('newCount').innerText = reservations.filter(r => r.status === 'NEW').length + '건';
       document.getElementById('activeCount').innerText = reservations.filter(r => (r.status || 'ACTIVE') === 'ACTIVE').length + '건';
+      document.getElementById('updatedCount').innerText = reservations.filter(r => r.status === 'UPDATED').length + '건';
       document.getElementById('waitingCount').innerText = reservations.filter(r => r.status === 'WAITING').length + '건';
       document.getElementById('cancelledCount').innerText = reservations.filter(r => r.status === 'CANCELLED').length + '건';
+    }
+
+    function updateBusSummary() {
+      const busMap = {};
+
+      reservations.forEach(r => {
+        if (r.status === 'CANCELLED' || r.status === 'WAITING') return;
+
+        const pax = parseInt(r.pax) || 1;
+
+        if (r.checkIn && r.busIn) {
+          const key = `[IN] ${r.checkIn} | ${r.busIn}`;
+          if (!busMap[key]) busMap[key] = { date: r.checkIn, type: 'IN', bus: r.busIn, pax: 0, count: 0 };
+          busMap[key].pax += pax;
+          busMap[key].count += 1;
+        }
+
+        if (r.checkOut && r.busOut) {
+          const key = `[OUT] ${r.checkOut} | ${r.busOut}`;
+          if (!busMap[key]) busMap[key] = { date: r.checkOut, type: 'OUT', bus: r.busOut, pax: 0, count: 0 };
+          busMap[key].pax += pax;
+          busMap[key].count += 1;
+        }
+      });
+
+      const keys = Object.keys(busMap).sort();
+      const container = document.getElementById('busSummaryList');
+
+      if (keys.length === 0) {
+        container.innerHTML = `<div class="col-span-full text-center text-gray-400 py-3">집계할 버스 이용 정보가 없습니다.</div>`;
+        return;
+      }
+
+      container.innerHTML = keys.map(k => {
+        const item = busMap[k];
+        const isIn = item.type === 'IN';
+        const badgeColor = isIn ? 'bg-blue-100 text-blue-800 border-blue-200' : 'bg-orange-100 text-orange-800 border-orange-200';
+
+        return `
+          <div class="bg-white p-2 rounded border shadow-sm flex items-center justify-between">
+            <div class="flex flex-col">
+              <div class="flex items-center gap-1">
+                <span class="text-[10px] px-1 py-0.2 rounded font-bold border ${badgeColor}">${item.type}</span>
+                <span class="font-bold text-gray-700">${item.date}</span>
+              </div>
+              <span class="text-[11px] text-gray-500 font-medium mt-0.5">${item.bus}</span>
+            </div>
+            <div class="text-right">
+              <span class="text-sm font-bold text-blue-600">${item.pax}명</span>
+              <span class="text-[10px] text-gray-400 block">(${item.count}건)</span>
+            </div>
+          </div>
+        `;
+      }).join('');
     }
 
     function renderTable() {
@@ -359,7 +459,13 @@
         let badgeColor = 'bg-emerald-100 text-emerald-800 border-emerald-300';
         let statusText = '확정';
         
-        if (status === 'WAITING') {
+        if (status === 'NEW') {
+          badgeColor = 'bg-sky-100 text-sky-800 border-sky-300';
+          statusText = '신규';
+        } else if (status === 'UPDATED') {
+          badgeColor = 'bg-indigo-100 text-indigo-800 border-indigo-300';
+          statusText = '수정';
+        } else if (status === 'WAITING') {
           badgeColor = 'bg-amber-100 text-amber-800 border-amber-300';
           statusText = '대기';
         } else if (status === 'CANCELLED') {
@@ -367,24 +473,18 @@
           statusText = '취소';
         }
 
-        const companions = item.companions || [];
-        const companionText = companions.map(c => {
-          const genderText = c.gender ? `(${c.gender})` : '';
-          return `${c.name || '미기재'}${genderText}`;
-        }).join(', ');
-
         return `
           <tr class="hover:bg-gray-50 border-b">
-            <td class="p-2 text-center">
+            <td class="p-2 text-center sticky-col-1">
               <span class="px-2 py-0.5 rounded-full text-[10px] font-bold border ${badgeColor}">
                 ${statusText}
               </span>
             </td>
-            <td class="p-2">
-              <div class="font-medium text-gray-900">${item.checkIn || '-'} ~ ${item.checkOut || '-'}</div>
-              <div class="text-[10px] text-gray-400">${item.nights || 0}박</div>
+            <td class="p-2 sticky-col-2">
+              <div class="font-medium text-gray-900">${item.checkIn || '-'}</div>
+              <div class="text-[11px] text-gray-500">~ ${item.checkOut || '-'} (${item.nights || 0}박)</div>
             </td>
-            <td class="p-2 font-semibold text-gray-800">${item.name || '-'}</td>
+            <td class="p-2 font-semibold text-gray-800 sticky-col-3">${item.name || '-'}</td>
             <td class="p-2 text-center">
               <div>${item.pax || 1}명</div>
               <div class="text-[10px] text-gray-400">${item.room || 1}실</div>
@@ -398,11 +498,11 @@
               <div>OUT: ${item.flightOut || '-'}</div>
             </td>
             <td class="p-2">${item.roomAllocation || '-'}</td>
-            <td class="p-2 max-w-[150px] truncate" title="${companionText}">
-              ${companionText || '<span class="text-gray-300">없음</span>'}
-            </td>
             <td class="p-2">
               <div class="truncate max-w-[120px]" title="${item.memo || ''}">${item.memo || '-'}</div>
+            </td>
+            <td class="p-2">
+              <div class="truncate max-w-[120px]" title="${item.hotelMemo || ''}">${item.hotelMemo || '-'}</div>
             </td>
             <td class="p-2 text-center">
               <div class="flex justify-center gap-1">
@@ -453,6 +553,7 @@
         }
       } else {
         document.getElementById('resForm').reset();
+        document.getElementById('formStatus').value = 'NEW';
         document.getElementById('editIndex').value = -1;
       }
 
