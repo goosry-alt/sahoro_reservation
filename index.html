@@ -114,7 +114,7 @@
       </div>
     </div>
 
-    <!-- 3. 예약 현황 테이블 (헤더 전체 상단 고정) -->
+    <!-- 3. 예약 현황 테이블 (상세보기 열 추가 및 전체 헤더 고정) -->
     <div class="bg-white rounded-lg shadow overflow-hidden border border-gray-200">
       <div class="table-container">
         <table class="w-full text-xs text-left text-gray-600 border-collapse">
@@ -129,12 +129,13 @@
               <th class="p-2.5 min-w-[90px]">방배정</th>
               <th class="p-2.5 min-w-[120px]">메모</th>
               <th class="p-2.5 min-w-[120px]">호텔 메모</th>
+              <th class="p-2.5 text-center min-w-[80px]">상세보기</th>
               <th class="p-2.5 text-center min-w-[90px]">관리</th>
             </tr>
           </thead>
           <tbody id="reservationTableBody" class="divide-y divide-gray-200">
             <tr>
-              <td colspan="10" class="p-8 text-center text-gray-400">
+              <td colspan="11" class="p-8 text-center text-gray-400">
                 데이터가 없습니다. Google Apps Script URL을 설정 후 [URL 저장]을 누르세요.
               </td>
             </tr>
@@ -456,7 +457,7 @@
     function renderTable() {
       const tbody = document.getElementById('reservationTableBody');
       if (reservations.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="10" class="p-8 text-center text-gray-400">등록된 예약 데이터가 없습니다.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="11" class="p-8 text-center text-gray-400">등록된 예약 데이터가 없습니다.</td></tr>`;
         return;
       }
 
@@ -511,6 +512,11 @@
               <div class="truncate max-w-[120px]" title="${item.hotelMemo || ''}">${item.hotelMemo || '-'}</div>
             </td>
             <td class="p-2 text-center">
+              <button type="button" onclick="openDetailWindow(${idx})" class="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 px-2 py-1 rounded text-[11px] font-medium transition flex items-center gap-1 mx-auto">
+                <i class="fa-solid fa-up-right-from-square text-[10px]"></i> 보기
+              </button>
+            </td>
+            <td class="p-2 text-center">
               <div class="flex justify-center gap-1">
                 <button type="button" onclick="openModal(${idx})" class="bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-1 rounded text-[11px] font-medium">수정</button>
                 <button type="button" onclick="deleteReservation(${idx})" class="bg-rose-100 hover:bg-rose-200 text-rose-700 px-2 py-1 rounded text-[11px] font-medium">삭제</button>
@@ -519,6 +525,140 @@
           </tr>
         `;
       }).join('');
+    }
+
+    /* 상세보기 새창 열기 및 엑셀 다운로드 팝업 구성 */
+    function openDetailWindow(index) {
+      const item = reservations[index];
+      if (!item) return;
+
+      const detailWin = window.open('', '_blank', 'width=800,height=750,scrollbars=yes,resizable=yes');
+      
+      const companions = item.companions || [];
+      const companionsRowsHtml = companions.length > 0 ? companions.map((c, i) => `
+        <tr class="border-b hover:bg-gray-50 text-xs">
+          <td class="p-2.5 text-center font-medium text-gray-500">${i + 1}</td>
+          <td class="p-2.5 font-bold text-gray-800">${c.name || '-'}</td>
+          <td class="p-2.5 text-center">${c.gender || '-'}</td>
+          <td class="p-2.5 text-center">${c.birth || '-'}</td>
+          <td class="p-2.5 text-center font-mono">${c.passport || '-'}</td>
+          <td class="p-2.5 text-center">${c.expiry || '-'}</td>
+          <td class="p-2.5 text-center">${c.isChild ? '<span class="text-xs bg-amber-100 text-amber-800 font-bold px-1.5 py-0.5 rounded">소아</span>' : '성인'}</td>
+        </tr>
+      `).join('') : `<tr><td colspan="7" class="p-6 text-center text-gray-400 text-xs">등록된 동행자 정보가 없습니다.</td></tr>`;
+
+      const popupHtml = `
+        <!DOCTYPE html>
+        <html lang="ko">
+        <head>
+          <meta charset="UTF-8">
+          <title>${item.name || '예약자'} - 상세보기</title>
+          <script src="https://cdn.tailwindcss.com"><\/script>
+          <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+          <style>body { font-family: 'Noto Sans KR', sans-serif; }</style>
+        </head>
+        <body class="bg-gray-50 p-6 text-gray-800">
+          <div class="max-w-3xl mx-auto bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+            <!-- Header -->
+            <div class="bg-slate-800 text-white px-6 py-4 flex justify-between items-center">
+              <h2 class="text-base font-bold flex items-center gap-2">
+                <i class="fa-solid fa-file-invoice text-blue-400"></i> 예약 상세 및 동행자 명단
+              </h2>
+              <button onclick="downloadExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-2 rounded font-bold shadow flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-file-excel text-sm"></i> 동행자 엑셀 다운로드
+              </button>
+            </div>
+
+            <div class="p-6 space-y-6">
+              <!-- 기본 예약 정보 요약 -->
+              <div>
+                <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">기본 예약 정보</h3>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-4 rounded-lg border border-slate-200 text-xs">
+                  <div><span class="text-gray-500 block">예약자명</span><span class="font-bold text-slate-800 text-sm">${item.name || '-'}</span></div>
+                  <div><span class="text-gray-500 block">상태</span><span class="font-semibold text-blue-600">${item.status || 'ACTIVE'}</span></div>
+                  <div><span class="text-gray-500 block">체크인 ~ 체크아웃</span><span class="font-medium">${item.checkIn || '-'} ~ ${item.checkOut || '-'} (${item.nights || 0}박)</span></div>
+                  <div><span class="text-gray-500 block">인원 / 객실</span><span class="font-medium">${item.pax || 1}명 / ${item.room || 1}실</span></div>
+                  <div><span class="text-gray-500 block">송영버스(IN/OUT)</span><span class="font-medium">${item.busIn || '-'} / ${item.busOut || '-'}</span></div>
+                  <div><span class="text-gray-500 block">항공편(IN/OUT)</span><span class="font-medium">${item.flightIn || '-'} / ${item.flightOut || '-'}</span></div>
+                  <div><span class="text-gray-500 block">방배정</span><span class="font-medium">${item.roomAllocation || '-'}</span></div>
+                  <div><span class="text-gray-500 block">리프트권</span><span class="font-medium">${item.lift || '-'}</span></div>
+                </div>
+              </div>
+
+              <!-- 동행자 리스트 -->
+              <div>
+                <div class="flex justify-between items-center mb-3">
+                  <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider">동행자 명단 (${companions.length}명)</h3>
+                </div>
+                <div class="border rounded-lg overflow-hidden border-gray-200">
+                  <table class="w-full text-left border-collapse">
+                    <thead class="bg-slate-100 text-[11px] text-gray-600 font-bold border-b">
+                      <tr>
+                        <th class="p-2.5 text-center w-12">No</th>
+                        <th class="p-2.5">이름</th>
+                        <th class="p-2.5 text-center">성별</th>
+                        <th class="p-2.5 text-center">생년월일</th>
+                        <th class="p-2.5 text-center">여권번호</th>
+                        <th class="p-2.5 text-center">여권 만료일</th>
+                        <th class="p-2.5 text-center">구분</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200">
+                      ${companionsRowsHtml}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="bg-gray-50 px-6 py-3 border-t text-right">
+              <button onclick="window.close()" class="px-4 py-1.5 text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 rounded font-medium">닫기</button>
+            </div>
+          </div>
+
+          <script>
+            function downloadExcel() {
+              const companions = ${JSON.stringify(companions)};
+              if (!companions || companions.length === 0) {
+                alert('다운로드할 동행자 정보가 없습니다.');
+                return;
+              }
+
+              let csvContent = "\\uFEFF"; // UTF-8 BOM
+              csvContent += "번호,이름,성별,생년월일,여권번호,여권유효기간,구분\\n";
+
+              companions.forEach((c, idx) => {
+                const childStr = c.isChild ? '소아' : '성인';
+                const row = [
+                  idx + 1,
+                  \`"\${c.name || ''}"\`,
+                  \`"\${c.gender || ''}"\`,
+                  \`"\${c.birth || ''}"\`,
+                  \`"\${c.passport || ''}"\`,
+                  \`"\${c.expiry || ''}"\`,
+                  \`"\${childStr}"\`
+                ];
+                csvContent += row.join(",") + "\\n";
+              });
+
+              const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+              const url = URL.createObjectURL(blob);
+              const link = document.createElement("a");
+              link.setAttribute("href", url);
+              link.setAttribute("download", \`동행자명단_\${"${item.name \vert{}\vert{} '예약자'}"}_\${"${item.checkIn || ''}"}.csv\`);
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+            }
+          <\/script>
+        </body>
+        </html>
+      `;
+
+      detailWin.document.open();
+      detailWin.document.write(popupHtml);
+      detailWin.document.close();
     }
 
     function calcNights() {
