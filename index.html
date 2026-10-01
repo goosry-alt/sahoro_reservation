@@ -766,11 +766,11 @@
       modalInstance.show();
     }
 
-    // 예약 저장/수정 함수
+    // 예약 저장/수정 처리 함수
     function saveReservation() {
       const url = localStorage.getItem('gas_app_url');
       if(!url) {
-        alert('Google Web App URL이 지정되지 않았습니다.');
+        alert('Google Web App URL이 지정되지 않았습니다. 상단 입력란에 URL을 저장해 주세요.');
         return;
       }
 
@@ -782,7 +782,7 @@
 
       const index = parseInt(document.getElementById('editingIndex').value);
       
-      // 동행자 수집
+      // 동행인원 정보 수집
       const companions = [];
       document.querySelectorAll('.companion-row').forEach(row => {
         companions.push({
@@ -797,98 +797,99 @@
       const payload = {
         action: index >= 0 ? 'update' : 'create',
         index: index,
-        data: {
-          status: document.getElementById('formStatus').value,
-          name: document.getElementById('formName').value.trim(),
-          checkIn: document.getElementById('formCheckIn').value,
-          checkOut: document.getElementById('formCheckOut').value,
-          nights: document.getElementById('formNights').value,
-          pax: document.getElementById('formPax').value,
-          room: document.getElementById('formRoom').value,
-          lift: document.getElementById('formLift').value.trim(),
-          roomAllocation: document.getElementById('formRoomAllocation').value.trim(),
-          busIn: document.getElementById('formBusIn').value.trim(),
-          flightIn: document.getElementById('formFlightIn').value.trim(),
-          busOut: document.getElementById('formBusOut').value.trim(),
-          flightOut: document.getElementById('formFlightOut').value.trim(),
-          memo: document.getElementById('formMemo').value.trim(),
-          hotelMemo: document.getElementById('formHotelMemo').value.trim(),
-          companions: companions
-        }
+        status: document.getElementById('formStatus').value,
+        name: document.getElementById('formName').value.trim(),
+        checkIn: document.getElementById('formCheckIn').value,
+        checkOut: document.getElementById('formCheckOut').value,
+        nights: document.getElementById('formNights').value,
+        pax: document.getElementById('formPax').value,
+        room: document.getElementById('formRoom').value,
+        lift: document.getElementById('formLift').value.trim(),
+        roomAllocation: document.getElementById('formRoomAllocation').value.trim(),
+        busIn: document.getElementById('formBusIn').value.trim(),
+        flightIn: document.getElementById('formFlightIn').value.trim(),
+        busOut: document.getElementById('formBusOut').value.trim(),
+        flightOut: document.getElementById('formFlightOut').value.trim(),
+        memo: document.getElementById('formMemo').value.trim(),
+        hotelMemo: document.getElementById('formHotelMemo').value.trim(),
+        companions: companions
       };
 
       const btnSave = document.getElementById('btnSave');
       btnSave.disabled = true;
-      btnSave.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> 저장 중...';
+      btnSave.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>저장 중...';
 
       fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'text/plain' }, // CORS 회피용 text/plain 설정
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify(payload)
       })
       .then(res => res.json())
-      .then(resData => {
+      .then(res => {
         btnSave.disabled = false;
         btnSave.innerHTML = '<i class="bi bi-check-lg me-1"></i>저장하기';
-        
-        if(resData && resData.result === 'success') {
+        if(res.result === 'success') {
           modalInstance.hide();
-          loadData(); // 최신 목록을 다시 호출
-        } else {
-          alert('저장 도중 오류가 발생했습니다: ' + (resData.message || '다시 시도해주세요.'));
-        }
-      })
-      .catch(err => {
-        console.error(err);
-        btnSave.disabled = false;
-        btnSave.innerHTML = '<i class="bi bi-check-lg me-1"></i>저장하기';
-        alert('서버와 통신하는 도중 오류가 발생했습니다.');
-      });
-    }
-
-    // 예약 삭제 함수
-    function deleteReservation(index) {
-      if(!confirm('정말로 이 예약 건을 삭제하시겠습니까?')) return;
-
-      const url = localStorage.getItem('gas_app_url');
-      if(!url) return;
-
-      const payload = {
-        action: 'delete',
-        index: index
-      };
-
-      fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify(payload)
-      })
-      .then(res => res.json())
-      .then(resData => {
-        if(resData && resData.result === 'success') {
           loadData();
         } else {
-          alert('삭제 도중 오류가 발생했습니다.');
+          alert('저장에 실패했습니다: ' + (res.message || '알 수 없는 오류'));
         }
       })
       .catch(err => {
         console.error(err);
-        alert('서버 연결 시 통신 오류가 발생했습니다.');
+        btnSave.disabled = false;
+        btnSave.innerHTML = '<i class="bi bi-check-lg me-1"></i>저장하기';
+        alert('서버 통신 오류가 발생했습니다.');
       });
     }
 
-    // 상세보기 모달 열기
+    // 예약 삭제 처리
+    function deleteReservation(index) {
+      const item = reservationData[index];
+      if(!item) return;
+
+      if(!confirm(`[${item.name || '선택 건'}] 예약을 opravdu 삭제하시겠습니까?`)) return;
+
+      const url = localStorage.getItem('gas_app_url');
+      if(!url) {
+        alert('Google Web App URL이 없습니다.');
+        return;
+      }
+
+      fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'delete', index: index })
+      })
+      .then(res => res.json())
+      .then(res => {
+        if(res.result === 'success') {
+          loadData();
+        } else {
+          alert('삭제 실패: ' + (res.message || ''));
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        alert('삭제 중 통신 오류가 발생했습니다.');
+      });
+    }
+
+    // 예약 상세 정보 모달 열기
     function openDetailModal(index) {
       currentDetailIndex = index;
       const item = reservationData[index];
       if(!item) return;
 
+      const body = document.getElementById('detailModalBody');
       let companionsHtml = '';
+
       if(Array.isArray(item.companions) && item.companions.length > 0) {
         companionsHtml = `
-          <table class="table table-sm table-bordered align-middle text-center mt-2" style="font-size:0.8rem;">
+          <table class="table table-sm table-bordered mt-2 align-middle">
             <thead class="table-light">
-              <tr>
+              <tr class="text-center">
+                <th>#</th>
                 <th>성명</th>
                 <th>생년월일</th>
                 <th>여권번호</th>
@@ -897,74 +898,98 @@
               </tr>
             </thead>
             <tbody>
-              ${item.companions.map(c => `
+              ${item.companions.map((c, i) => `
                 <tr>
-                  <td>${c.name || '-'}</td>
-                  <td>${formatDateDisplay(c.birth) || '-'}</td>
-                  <td>${c.passport || '-'}</td>
-                  <td>${formatDateDisplay(c.expiry) || '-'}</td>
-                  <td>${c.isChild ? '<span class="badge bg-warning text-dark">어린이</span>' : '성인'}</td>
+                  <td class="text-center">${i + 1}</td>
+                  <td>${c.name || ''}</td>
+                  <td class="text-center">${formatDateDisplay(c.birth)}</td>
+                  <td>${c.passport || ''}</td>
+                  <td class="text-center">${formatDateDisplay(c.expiry)}</td>
+                  <td class="text-center">${c.isChild ? '<span class="badge bg-info text-dark">어린이</span>' : '성인'}</td>
                 </tr>
               `).join('')}
             </tbody>
           </table>
         `;
       } else {
-        companionsHtml = '<div class="text-muted small py-1">등록된 동행자 정보가 없습니다.</div>';
+        companionsHtml = '<div class="text-muted small py-2">등록된 동행자 정보가 없습니다.</div>';
       }
 
-      document.getElementById('detailModalBody').innerHTML = `
-        <div class="row g-2 mb-3">
-          <div class="col-md-3"><strong>상태:</strong> ${item.status || '예약'}</div>
-          <div class="col-md-3"><strong>예약자:</strong> ${item.name || ''}</div>
+      body.innerHTML = `
+        <div class="row g-3 mb-3">
+          <div class="col-md-3"><strong>상태:</strong> <span class="badge badge-status bg-status-${item.status}">${item.status || '예약'}</span></div>
+          <div class="col-md-3"><strong>예약자명:</strong> ${item.name || ''}</div>
           <div class="col-md-3"><strong>체크인:</strong> ${formatDateDisplay(item.checkIn)}</div>
-          <div class="col-md-3"><strong>체크아웃:</strong> ${formatDateDisplay(item.checkOut)}</div>
-        </div>
-        <div class="row g-2 mb-3">
-          <div class="col-md-3"><strong>박수 / PAX:</strong> ${item.nights || 0}박 / ${item.pax || 1}명</div>
-          <div class="col-md-3"><strong>객실 수:</strong> ${item.room || 1}개</div>
+          <div class="col-md-3"><strong>체크아웃:</strong> ${formatDateDisplay(item.checkOut)} (${item.nights || 0}박)</div>
+          <div class="col-md-3"><strong>인원(PAX):</strong> ${item.pax || 1}명</div>
+          <div class="col-md-3"><strong>객실 수:</strong> ${item.room || 1}실</div>
           <div class="col-md-3"><strong>리프권:</strong> ${item.lift || '-'}</div>
           <div class="col-md-3"><strong>방배정:</strong> ${item.roomAllocation || '-'}</div>
         </div>
-        <div class="row g-2 mb-3">
-          <div class="col-md-6"><strong>송영(IN) / 항공(IN):</strong> ${item.busIn || '-'} / ${item.flightIn || '-'}</div>
-          <div class="col-md-6"><strong>송영(OUT) / 항공(OUT):</strong> ${item.busOut || '-'} / ${item.flightOut || '-'}</div>
+        <hr>
+        <div class="row g-3 mb-3">
+          <div class="col-md-6"><strong>IN 버스 / 항공:</strong> ${item.busIn || '-'} / ${item.flightIn || '-'}</div>
+          <div class="col-md-6"><strong>OUT 버스 / 항공:</strong> ${item.busOut || '-'} / ${item.flightOut || '-'}</div>
         </div>
         <hr>
-        <h6><i class="bi bi-people me-1"></i> 동행자 명단</h6>
-        ${companionsHtml}
+        <div class="mb-3">
+          <h6 class="fw-bold text-primary mb-1"><i class="bi bi-people me-1"></i> 동행인원 목록</h6>
+          ${companionsHtml}
+        </div>
         <hr>
-        <div class="mb-2"><strong>고객 메모:</strong><br><span class="text-muted">${item.memo || '없음'}</span></div>
-        <div><strong>호텔 전달 메모:</strong><br><span class="text-primary">${item.hotelMemo || '없음'}</span></div>
+        <div class="row g-2">
+          <div class="col-md-6">
+            <strong>고객 메모:</strong>
+            <p class="p-2 bg-light rounded small mb-0 border" style="white-space: pre-wrap;">${item.memo || '없음'}</p>
+          </div>
+          <div class="col-md-6">
+            <strong class="text-primary">호텔 전달 메모:</strong>
+            <p class="p-2 bg-warning bg-opacity-10 border border-warning rounded small mb-0" style="white-space: pre-wrap;">${item.hotelMemo || '없음'}</p>
+          </div>
+        </div>
       `;
 
       detailModalInstance.show();
     }
 
-    // 엑셀 내보내기 함수
+    // 상세보기 모달 데이터 엑셀 추출
     function exportDetailToExcel(item) {
-      const exportData = [
-        { "항목": "상태", "내용": item.status || '예약' },
-        { "항목": "예약자명", "내용": item.name || '' },
-        { "항목": "체크인", "내용": formatDateDisplay(item.checkIn) },
-        { "항목": "체크아웃", "내용": formatDateDisplay(item.checkOut) },
-        { "항목": "박수", "내용": item.nights || 0 },
-        { "항목": "PAX", "내용": item.pax || 1 },
-        { "항목": "객실수", "내용": item.room || 1 },
-        { "항목": "리프권", "내용": item.lift || '' },
-        { "항목": "방배정", "내용": item.roomAllocation || '' },
-        { "항목": "송영(IN)", "내용": item.busIn || '' },
-        { "항목": "항공(IN)", "내용": item.flightIn || '' },
-        { "항목": "송영(OUT)", "내용": item.busOut || '' },
-        { "항목": "항공(OUT)", "내용": item.flightOut || '' },
-        { "항목": "고객메모", "내용": item.memo || '' },
-        { "항목": "호텔메모", "내용": item.hotelMemo || '' }
+      if(!item) return;
+
+      const excelData = [
+        ["예약 상세정보"],
+        ["상태", item.status || '예약', "예약자명", item.name || ''],
+        ["체크인", formatDateDisplay(item.checkIn), "체크아웃", formatDateDisplay(item.checkOut), "박수", item.nights || 0],
+        ["인원(PAX)", item.pax || 1, "객실 수", item.room || 1, "리프권", item.lift || ''],
+        ["송영(IN)", item.busIn || '', "항공편(IN)", item.flightIn || ''],
+        ["송영(OUT)", item.busOut || '', "항공편(OUT)", item.flightOut || ''],
+        ["방배정", item.roomAllocation || ''],
+        ["고객메모", item.memo || ''],
+        ["호텔메모", item.hotelMemo || ''],
+        [],
+        ["[동행인원 명단]"],
+        ["번호", "성명", "생년월일", "여권번호", "만료일", "구분"]
       ];
 
-      const ws = XLSX.utils.json_to_sheet(exportData);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "예약상세");
-      XLSX.writeFile(wb, `예약상세_${item.name || '예약자'}.xlsx`);
+      if(Array.isArray(item.companions) && item.companions.length > 0) {
+        item.companions.forEach((c, i) => {
+          excelData.push([
+            i + 1,
+            c.name || '',
+            formatDateDisplay(c.birth),
+            c.passport || '',
+            formatDateDisplay(c.expiry),
+            c.isChild ? '어린이' : '성인'
+          ]);
+        });
+      }
+
+      const worksheet = XLSX.utils.aoa_to_sheet(excelData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "예약상세");
+
+      const filename = `예약상세_${item.name || '고객'}_${formatDateInput(item.checkIn)}.xlsx`;
+      XLSX.writeFile(workbook, filename);
     }
   </script>
 </body>
