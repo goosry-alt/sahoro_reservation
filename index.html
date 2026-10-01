@@ -25,9 +25,9 @@
       position: sticky;
       top: 0;
       z-index: 20;
-      background-color: #334155 !important; /* bg-slate-700 색상 유지 */
+      background-color: #334155 !important;
       color: #ffffff;
-      box-shadow: inset 0 -1px 0 #475569; /* 스크롤 시 헤더 구분선 유지 */
+      box-shadow: inset 0 -1px 0 #475569;
     }
     
     /* 3. 좌측 주요 열 3개 상단+좌측 이중 고정 (Sticky Left + Top) */
@@ -35,7 +35,6 @@
     .sticky-col-2 { position: sticky; left: 70px; z-index: 10; background-color: #ffffff; }
     .sticky-col-3 { position: sticky; left: 180px; z-index: 10; background-color: #ffffff; }
     
-    /* 좌측 고정 열의 헤더 교차점 z-index 최상위(30) 교정 */
     thead th.sticky-col-1,
     thead th.sticky-col-2,
     thead th.sticky-col-3 {
@@ -55,7 +54,7 @@
       <div class="flex items-center gap-2 flex-grow max-w-xl">
         <input type="text" id="scriptUrl" placeholder="Google Apps Script URL을 입력하세요" 
                class="w-full px-3 py-1.5 text-sm text-gray-900 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
-        <button type="button" onclick="saveApiUrl()" class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-1.5 rounded whitespace-nowrap font-medium transition">
+        <button type="button" onclick="saveApiUrl(event)" class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-1.5 rounded whitespace-nowrap font-medium transition">
           URL 저장
         </button>
       </div>
@@ -114,7 +113,7 @@
       </div>
     </div>
 
-    <!-- 3. 예약 현황 테이블 (상세보기 열 추가 및 전체 헤더 고정) -->
+    <!-- 3. 예약 현황 테이블 -->
     <div class="bg-white rounded-lg shadow overflow-hidden border border-gray-200">
       <div class="table-container">
         <table class="w-full text-xs text-left text-gray-600 border-collapse">
@@ -345,23 +344,36 @@
   <script>
     let reservations = [];
 
-    window.onload = function() {
+    window.addEventListener('DOMContentLoaded', function() {
       const savedUrl = localStorage.getItem('scriptApiUrl');
       if (savedUrl) {
         document.getElementById('scriptUrl').value = savedUrl;
         loadData();
       }
-    };
+    });
 
-    function saveApiUrl() {
-      const url = document.getElementById('scriptUrl').value.trim();
+    function saveApiUrl(e) {
+      if (e && e.preventDefault) e.preventDefault();
+      
+      const inputEl = document.getElementById('scriptUrl');
+      if (!inputEl) {
+        alert('입력창 요소를 찾을 수 없습니다.');
+        return;
+      }
+
+      const url = inputEl.value.trim();
       if (!url) {
         alert('URL을 입력해주세요.');
         return;
       }
-      localStorage.setItem('scriptApiUrl', url);
-      alert('API URL이 저장되었습니다.');
-      loadData();
+
+      try {
+        localStorage.setItem('scriptApiUrl', url);
+        alert('API URL이 성공적으로 저장되었습니다.');
+        loadData();
+      } catch (err) {
+        alert('로컬 저장소 저장에 실패했습니다: ' + err.message);
+      }
     }
 
     function getApiUrl() {
@@ -527,7 +539,6 @@
       }).join('');
     }
 
-    /* 상세보기 새창 열기 및 엑셀 다운로드 팝업 구성 */
     function openDetailWindow(index) {
       const item = reservations[index];
       if (!item) return;
@@ -559,7 +570,6 @@
         </head>
         <body class="bg-gray-50 p-6 text-gray-800">
           <div class="max-w-3xl mx-auto bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
-            <!-- Header -->
             <div class="bg-slate-800 text-white px-6 py-4 flex justify-between items-center">
               <h2 class="text-base font-bold flex items-center gap-2">
                 <i class="fa-solid fa-file-invoice text-blue-400"></i> 예약 상세 및 동행자 명단
@@ -570,7 +580,6 @@
             </div>
 
             <div class="p-6 space-y-6">
-              <!-- 기본 예약 정보 요약 -->
               <div>
                 <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">기본 예약 정보</h3>
                 <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-4 rounded-lg border border-slate-200 text-xs">
@@ -585,7 +594,6 @@
                 </div>
               </div>
 
-              <!-- 동행자 리스트 -->
               <div>
                 <div class="flex justify-between items-center mb-3">
                   <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider">동행자 명단 (${companions.length}명)</h3>
@@ -611,7 +619,6 @@
               </div>
             </div>
 
-            <!-- Footer -->
             <div class="bg-gray-50 px-6 py-3 border-t text-right">
               <button onclick="window.close()" class="px-4 py-1.5 text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 rounded font-medium">닫기</button>
             </div>
@@ -625,7 +632,7 @@
                 return;
               }
 
-              let csvContent = "\\uFEFF"; // UTF-8 BOM
+              let csvContent = "\\uFEFF";
               csvContent += "번호,이름,성별,생년월일,여권번호,여권유효기간,구분\\n";
 
               companions.forEach((c, idx) => {
@@ -735,7 +742,8 @@
     }
 
     async function handleFormSubmit(e) {
-      e.preventDefault();
+      if (e && e.preventDefault) e.preventDefault();
+      
       const url = getApiUrl();
       if (!url) {
         alert('Google Apps Script URL이 설정되지 않았습니다.');
