@@ -9,33 +9,31 @@
   <style>
     body { font-family: 'Noto Sans KR', sans-serif; }
     
+    /* 테이블 틀고정 스타일 */
     .table-container {
       max-height: 600px;
       overflow: auto;
-      position: relative;
     }
-    
     .table-container table {
       border-separate: 0;
-      width: 100%;
     }
     .table-container thead th {
       position: sticky;
       top: 0;
       z-index: 20;
-      background-color: #334155 !important;
-      color: #ffffff;
-      box-shadow: inset 0 -1px 0 #475569;
     }
     
+    /* 좌측 열 고정 (Sticky Left Columns) */
     .sticky-col-1 { position: sticky; left: 0; z-index: 10; background-color: #ffffff; }
     .sticky-col-2 { position: sticky; left: 70px; z-index: 10; background-color: #ffffff; }
     .sticky-col-3 { position: sticky; left: 180px; z-index: 10; background-color: #ffffff; }
     
+    /* 헤더 sticky 순서 맞춤 */
     thead th.sticky-col-1,
     thead th.sticky-col-2,
     thead th.sticky-col-3 {
       z-index: 30 !important;
+      background-color: #334155 !important; /* bg-slate-700 */
     }
   </style>
 </head>
@@ -51,16 +49,16 @@
       <div class="flex items-center gap-2 flex-grow max-w-xl">
         <input type="text" id="scriptUrl" placeholder="Google Apps Script URL을 입력하세요" 
                class="w-full px-3 py-1.5 text-sm text-gray-900 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
-        <button type="button" id="btnSaveUrl" class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-1.5 rounded whitespace-nowrap font-medium transition cursor-pointer">
+        <button onclick="saveApiUrl()" class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-1.5 rounded whitespace-nowrap font-medium transition">
           URL 저장
         </button>
       </div>
 
       <div class="flex items-center gap-2">
-        <button type="button" id="btnLoadData" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm px-3 py-1.5 rounded font-medium transition flex items-center gap-1 cursor-pointer">
+        <button onclick="loadData()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm px-3 py-1.5 rounded font-medium transition flex items-center gap-1">
           <i class="fa-solid fa-rotate"></i> 불러오기
         </button>
-        <button type="button" id="btnNewRes" class="bg-amber-600 hover:bg-amber-700 text-white text-sm px-3 py-1.5 rounded font-medium transition flex items-center gap-1 cursor-pointer">
+        <button onclick="openModal(-1)" class="bg-amber-600 hover:bg-amber-700 text-white text-sm px-3 py-1.5 rounded font-medium transition flex items-center gap-1">
           <i class="fa-solid fa-plus"></i> 신규 예약
         </button>
       </div>
@@ -70,16 +68,16 @@
   <!-- Main Content -->
   <main class="max-w-7xl mx-auto px-4 py-6 space-y-6">
 
-    <!-- 1. 동일 날짜 & 버스 이용 인원 자동 집계 현황 -->
+    <!-- 1. 동일 날짜 & 버스 이용 인원 자동 집계 현황 (스크롤 적용 & 클릭 이벤트) -->
     <div class="bg-white rounded-lg shadow p-4 border border-gray-200">
       <div class="flex items-center justify-between mb-2">
         <h3 class="text-xs font-bold text-slate-700 uppercase flex items-center gap-1.5">
           <i class="fa-solid fa-bus text-blue-600"></i> 동일 날짜/버스별 탑승 인원 현황
         </h3>
-        <span class="text-[11px] text-gray-400">* 확정/신규/수정 상태의 인원만 자동 집계됩니다.</span>
+        <span class="text-[11px] text-gray-400">* 카드 클릭 시 버스별 예약자 명단을 확인할 수 있습니다.</span>
       </div>
       
-      <div class="max-h-32 overflow-y-auto pr-1 border rounded bg-gray-50">
+      <div class="max-h-36 overflow-y-auto pr-1 border rounded bg-gray-50">
         <div id="busSummaryList" class="p-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 text-xs">
           <div class="col-span-full text-center text-gray-400 py-3">데이터를 불러오면 집계 정보가 표시됩니다.</div>
         </div>
@@ -110,29 +108,28 @@
       </div>
     </div>
 
-    <!-- 3. 예약 현황 테이블 -->
+    <!-- 3. 예약 현황 테이블 (틀고정 적용) -->
     <div class="bg-white rounded-lg shadow overflow-hidden border border-gray-200">
       <div class="table-container">
         <table class="w-full text-xs text-left text-gray-600 border-collapse">
-          <thead class="bg-slate-700 uppercase text-[11px] tracking-wider">
+          <thead class="bg-slate-700 text-white uppercase text-[11px] tracking-wider">
             <tr>
-              <th class="p-2.5 text-center sticky-col-1 w-[70px]">상태</th>
-              <th class="p-2.5 sticky-col-2 w-[110px]">체크인/아웃</th>
-              <th class="p-2.5 sticky-col-3 w-[100px]">예약자명</th>
-              <th class="p-2.5 text-center min-w-[80px]">인원/객실</th>
-              <th class="p-2.5 min-w-[160px]">송영버스(IN/OUT)</th>
-              <th class="p-2.5 min-w-[140px]">항공편(IN/OUT)</th>
-              <th class="p-2.5 min-w-[90px]">방배정</th>
-              <th class="p-2.5 min-w-[120px]">메모</th>
-              <th class="p-2.5 min-w-[120px]">호텔 메모</th>
-              <th class="p-2.5 text-center min-w-[80px]">상세보기</th>
-              <th class="p-2.5 text-center min-w-[90px]">관리</th>
+              <th class="p-2.5 text-center border-b border-slate-600 sticky-col-1 w-[70px]">상태</th>
+              <th class="p-2.5 border-b border-slate-600 sticky-col-2 w-[110px]">체크인/아웃</th>
+              <th class="p-2.5 border-b border-slate-600 sticky-col-3 w-[100px]">예약자명</th>
+              <th class="p-2.5 text-center border-b border-slate-600 min-w-[80px]">인원/객실</th>
+              <th class="p-2.5 border-b border-slate-600 min-w-[160px]">송영버스(IN/OUT)</th>
+              <th class="p-2.5 border-b border-slate-600 min-w-[140px]">항공편(IN/OUT)</th>
+              <th class="p-2.5 border-b border-slate-600 min-w-[90px]">방배정</th>
+              <th class="p-2.5 border-b border-slate-600 min-w-[160px]">동행자 정보</th>
+              <th class="p-2.5 border-b border-slate-600 min-w-[120px]">메모</th>
+              <th class="p-2.5 text-center border-b border-slate-600 min-w-[90px]">관리</th>
             </tr>
           </thead>
           <tbody id="reservationTableBody" class="divide-y divide-gray-200">
             <tr>
-              <td colspan="11" class="p-8 text-center text-gray-400">
-                데이터가 없습니다. Google Apps Script URL을 설정 후 [URL 저장]을 누르세요.
+              <td colspan="10" class="p-8 text-center text-gray-400">
+                데이터가 없습니다. [불러오기] 버튼을 클릭하세요.
               </td>
             </tr>
           </tbody>
@@ -141,15 +138,38 @@
     </div>
   </main>
 
+  <!-- 버스 탑승자 목록 모달 팝업 -->
+  <div id="busPassengerModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
+      <div class="bg-slate-800 text-white px-5 py-3 flex justify-between items-center">
+        <h3 id="busModalTitle" class="text-sm font-bold flex items-center gap-2">
+          <i class="fa-solid fa-bus text-blue-400"></i> 버스 탑승 명단
+        </h3>
+        <button onclick="closeBusModal()" class="text-gray-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+      <div class="p-4 space-y-3">
+        <div id="busModalSubTitle" class="text-xs text-slate-500 font-medium pb-2 border-b"></div>
+        <div class="max-h-60 overflow-y-auto">
+          <ul id="busPassengerList" class="divide-y divide-gray-100 text-xs">
+            <!-- 동적 탑승자 명단 -->
+          </ul>
+        </div>
+      </div>
+      <div class="bg-gray-50 px-4 py-2 border-t text-right">
+        <button onclick="closeBusModal()" class="px-3 py-1.5 text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 rounded font-medium">닫기</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Reservation Form Modal -->
   <div id="resModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50 overflow-y-auto">
     <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl my-8 overflow-hidden">
       <div class="bg-slate-800 text-white px-6 py-4 flex justify-between items-center">
         <h3 id="modalTitle" class="text-lg font-bold">예약 정보 수정</h3>
-        <button type="button" onclick="closeModal()" class="text-gray-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+        <button onclick="closeModal()" class="text-gray-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
       </div>
 
-      <form id="resForm" class="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
+      <form id="resForm" onsubmit="handleFormSubmit(event)" class="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
         <input type="hidden" id="editIndex" value="-1">
 
         <!-- 기본 정보 -->
@@ -174,11 +194,11 @@
             </div>
             <div>
               <label class="block text-xs font-bold text-gray-600 mb-1">체크인 *</label>
-              <input type="date" id="formCheckIn" required class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+              <input type="date" id="formCheckIn" required onchange="calcNights()" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
             </div>
             <div>
               <label class="block text-xs font-bold text-gray-600 mb-1">체크아웃 *</label>
-              <input type="date" id="formCheckOut" required class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+              <input type="date" id="formCheckOut" required onchange="calcNights()" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
             </div>
             <div>
               <label class="block text-xs font-bold text-gray-600 mb-1">박수</label>
@@ -307,7 +327,7 @@
             <h4 class="font-semibold text-gray-700 text-sm flex items-center gap-2">
               <i class="fa-solid fa-users text-blue-600"></i> 동행인 명단
             </h4>
-            <button type="button" id="btnAddCompanion" class="bg-slate-700 hover:bg-slate-800 text-white text-xs px-2.5 py-1 rounded">
+            <button type="button" onclick="addCompanionRow()" class="bg-slate-700 hover:bg-slate-800 text-white text-xs px-2.5 py-1 rounded">
               + 동행인 추가
             </button>
           </div>
@@ -340,49 +360,25 @@
 
   <script>
     let reservations = [];
+    let busMapGlobal = {};
 
-    // DOM 로드 완료 후 이벤트 바인딩
-    document.addEventListener('DOMContentLoaded', function() {
+    window.onload = function() {
       const savedUrl = localStorage.getItem('scriptApiUrl');
       if (savedUrl) {
         document.getElementById('scriptUrl').value = savedUrl;
         loadData();
       }
+    };
 
-      const saveBtn = document.getElementById('btnSaveUrl');
-      if (saveBtn) saveBtn.addEventListener('click', saveApiUrlHandler);
-
-      const loadBtn = document.getElementById('btnLoadData');
-      if (loadBtn) loadBtn.addEventListener('click', loadData);
-
-      const newResBtn = document.getElementById('btnNewRes');
-      if (newResBtn) newResBtn.addEventListener('click', function() { openModal(-1); });
-
-      const resForm = document.getElementById('resForm');
-      if (resForm) resForm.addEventListener('submit', handleFormSubmit);
-
-      const addCompBtn = document.getElementById('btnAddCompanion');
-      if (addCompBtn) addCompBtn.addEventListener('click', function() { addCompanionRow(); });
-
-      document.getElementById('formCheckIn').addEventListener('change', calcNights);
-      document.getElementById('formCheckOut').addEventListener('change', calcNights);
-    });
-
-    function saveApiUrlHandler(e) {
-      if (e) e.preventDefault();
-      const inputEl = document.getElementById('scriptUrl');
-      if (!inputEl) return alert('URL 입력창 요소를 찾을 수 없습니다.');
-
-      const url = inputEl.value.trim();
-      if (!url) return alert('Google Apps Script URL을 입력해주세요.');
-
-      try {
-        localStorage.setItem('scriptApiUrl', url);
-        alert('API URL이 저장되었습니다!');
-        loadData();
-      } catch (err) {
-        alert('로컬 저장소 저장에 실패했습니다: ' + err.message);
+    function saveApiUrl() {
+      const url = document.getElementById('scriptUrl').value.trim();
+      if (!url) {
+        alert('URL을 입력해주세요.');
+        return;
       }
+      localStorage.setItem('scriptApiUrl', url);
+      alert('API URL이 저장되었습니다.');
+      loadData();
     }
 
     function getApiUrl() {
@@ -392,7 +388,7 @@
     async function loadData() {
       const url = getApiUrl();
       if (!url) {
-        alert('Google Apps Script URL을 먼저 설정 후 [URL 저장]을 누르세요.');
+        alert('Google Apps Script URL을 먼저 설정해주세요.');
         return;
       }
 
@@ -413,6 +409,7 @@
       }
     }
 
+    // 상태 요약 카운트 업데이트
     function updateSummary() {
       document.getElementById('newCount').innerText = reservations.filter(r => r.status === 'NEW').length + '건';
       document.getElementById('activeCount').innerText = reservations.filter(r => (r.status || 'ACTIVE') === 'ACTIVE').length + '건';
@@ -421,29 +418,40 @@
       document.getElementById('cancelledCount').innerText = reservations.filter(r => r.status === 'CANCELLED').length + '건';
     }
 
+    // 동일 날짜 & 동일 버스 이용 인원 집계 함수 (탑승자 목록 포함)
     function updateBusSummary() {
-      const busMap = {};
+      busMapGlobal = {};
 
       reservations.forEach(r => {
+        // 취소/대기 건 제외
         if (r.status === 'CANCELLED' || r.status === 'WAITING') return;
+
         const pax = parseInt(r.pax) || 1;
 
+        // IN 버스 집계
         if (r.checkIn && r.busIn) {
           const key = `[IN] ${r.checkIn} | ${r.busIn}`;
-          if (!busMap[key]) busMap[key] = { date: r.checkIn, type: 'IN', bus: r.busIn, pax: 0, count: 0 };
-          busMap[key].pax += pax;
-          busMap[key].count += 1;
+          if (!busMapGlobal[key]) {
+            busMapGlobal[key] = { date: r.checkIn, type: 'IN', bus: r.busIn, pax: 0, count: 0, passengers: [] };
+          }
+          busMapGlobal[key].pax += pax;
+          busMapGlobal[key].count += 1;
+          busMapGlobal[key].passengers.push({ name: r.name || '미기재', pax: pax, status: r.status });
         }
 
+        // OUT 버스 집계
         if (r.checkOut && r.busOut) {
           const key = `[OUT] ${r.checkOut} | ${r.busOut}`;
-          if (!busMap[key]) busMap[key] = { date: r.checkOut, type: 'OUT', bus: r.busOut, pax: 0, count: 0 };
-          busMap[key].pax += pax;
-          busMap[key].count += 1;
+          if (!busMapGlobal[key]) {
+            busMapGlobal[key] = { date: r.checkOut, type: 'OUT', bus: r.busOut, pax: 0, count: 0, passengers: [] };
+          }
+          busMapGlobal[key].pax += pax;
+          busMapGlobal[key].count += 1;
+          busMapGlobal[key].passengers.push({ name: r.name || '미기재', pax: pax, status: r.status });
         }
       });
 
-      const keys = Object.keys(busMap).sort();
+      const keys = Object.keys(busMapGlobal).sort();
       const container = document.getElementById('busSummaryList');
 
       if (keys.length === 0) {
@@ -452,18 +460,18 @@
       }
 
       container.innerHTML = keys.map(k => {
-        const item = busMap[k];
+        const item = busMapGlobal[k];
         const isIn = item.type === 'IN';
         const badgeColor = isIn ? 'bg-blue-100 text-blue-800 border-blue-200' : 'bg-orange-100 text-orange-800 border-orange-200';
 
         return `
-          <div class="bg-white p-2 rounded border shadow-sm flex items-center justify-between">
+          <div onclick="openBusModal('${k}')" class="bg-white p-2 rounded border shadow-sm hover:shadow-md transition cursor-pointer flex items-center justify-between group">
             <div class="flex flex-col">
               <div class="flex items-center gap-1">
                 <span class="text-[10px] px-1 py-0.2 rounded font-bold border ${badgeColor}">${item.type}</span>
                 <span class="font-bold text-gray-700">${item.date}</span>
               </div>
-              <span class="text-[11px] text-gray-500 font-medium mt-0.5">${item.bus}</span>
+              <span class="text-[11px] text-gray-500 font-medium mt-0.5 group-hover:text-blue-600 transition">${item.bus}</span>
             </div>
             <div class="text-right">
               <span class="text-sm font-bold text-blue-600">${item.pax}명</span>
@@ -474,14 +482,83 @@
       }).join('');
     }
 
+    // 버스 탑승자 모달 열기
+    function openBusModal(key) {
+      const item = busMapGlobal[key];
+      if (!item) return;
+
+      document.getElementById('busModalSubTitle').innerText = `${item.date} [${item.type}] - ${item.bus} (총 ${item.pax}명 / ${item.count}건)`;
+      
+      const listEl = document.getElementById('busPassengerList');
+      if (item.passengers.length === 0) {
+        listEl.innerHTML = `<li class="py-3 text-center text-gray-400">탑승 인원이 없습니다.</li>`;
+      } else {
+        listEl.innerHTML = item.passengers.map((p, i) => `
+          <li class="py-2 flex justify-between items-center">
+            <div class="font-medium text-slate-800">${i + 1}. ${p.name}</div>
+            <div class="flex items-center gap-2 text-slate-500">
+              <span class="font-bold text-blue-600">${p.pax}명</span>
+              <span class="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 font-semibold">${p.status || 'ACTIVE'}</span>
+            </div>
+          </li>
+        `).join('');
+      }
+
+      document.getElementById('busPassengerModal').classList.remove('hidden');
+      document.getElementById('busPassengerModal').classList.add('flex');
+    }
+
+    function closeBusModal() {
+      document.getElementById('busPassengerModal').classList.add('hidden');
+      document.getElementById('busPassengerModal').classList.remove('flex');
+    }
+
+    /**
+     * 상태별 정렬 로직:
+     * 1. NEW, UPDATED, WAITING, CANCELLED 최상단 고정
+     * 2. ACTIVE (확정) 상태는 체크인 날짜 오름차순 정렬
+     */
+    function getSortedReservations() {
+      const pinnedOrder = { 'NEW': 1, 'UPDATED': 2, 'WAITING': 3, 'CANCELLED': 4 };
+
+      // 각 데이터의 원본 인덱스 보존
+      const indexedList = reservations.map((item, originalIndex) => ({ ...item, originalIndex }));
+
+      return indexedList.sort((a, b) => {
+        const statusA = a.status || 'ACTIVE';
+        const statusB = b.status || 'ACTIVE';
+
+        const isAPinned = statusA in pinnedOrder;
+        const isBPinned = statusB in pinnedOrder;
+
+        // 둘 다 상단 고정 상태인 경우 고정 순서대로
+        if (isAPinned && isBPinned) {
+          return pinnedOrder[statusA] - pinnedOrder[statusB];
+        }
+
+        // 하나만 고정 상태인 경우 고정 상태를 상단으로
+        if (isAPinned) return -1;
+        if (isBPinned) return 1;
+
+        // 둘 다 확정(ACTIVE) 상태인 경우 체크인 날짜 오름차순 정렬
+        const dateA = a.checkIn ? new Date(a.checkIn) : new Date('9999-12-31');
+        const dateB = b.checkIn ? new Date(b.checkIn) : new Date('9999-12-31');
+
+        return dateA - dateB;
+      });
+    }
+
     function renderTable() {
       const tbody = document.getElementById('reservationTableBody');
       if (reservations.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="11" class="p-8 text-center text-gray-400">등록된 예약 데이터가 없습니다.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="10" class="p-8 text-center text-gray-400">등록된 예약 데이터가 없습니다.</td></tr>`;
         return;
       }
 
-      tbody.innerHTML = reservations.map((item, idx) => {
+      const sortedData = getSortedReservations();
+
+      tbody.innerHTML = sortedData.map((item) => {
+        const idx = item.originalIndex;
         const status = item.status || 'ACTIVE';
         let badgeColor = 'bg-emerald-100 text-emerald-800 border-emerald-300';
         let statusText = '확정';
@@ -499,6 +576,12 @@
           badgeColor = 'bg-rose-100 text-rose-800 border-rose-300';
           statusText = '취소';
         }
+
+        const companions = item.companions || [];
+        const companionText = companions.map(c => {
+          const genderText = c.gender ? `(${c.gender})` : '';
+          return `${c.name || '미기재'}${genderText}`;
+        }).join(', ');
 
         return `
           <tr class="hover:bg-gray-50 border-b">
@@ -525,21 +608,16 @@
               <div>OUT: ${item.flightOut || '-'}</div>
             </td>
             <td class="p-2">${item.roomAllocation || '-'}</td>
+            <td class="p-2 max-w-[150px] truncate" title="${companionText}">
+              ${companionText || '<span class="text-gray-300">없음</span>'}
+            </td>
             <td class="p-2">
               <div class="truncate max-w-[120px]" title="${item.memo || ''}">${item.memo || '-'}</div>
             </td>
-            <td class="p-2">
-              <div class="truncate max-w-[120px]" title="${item.hotelMemo || ''}">${item.hotelMemo || '-'}</div>
-            </td>
-            <td class="p-2 text-center">
-              <button type="button" onclick="openDetailWindow(${idx})" class="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 px-2 py-1 rounded text-[11px] font-medium transition flex items-center gap-1 mx-auto">
-                <i class="fa-solid fa-up-right-from-square text-[10px]"></i> 보기
-              </button>
-            </td>
             <td class="p-2 text-center">
               <div class="flex justify-center gap-1">
-                <button type="button" onclick="openModal(${idx})" class="bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-1 rounded text-[11px] font-medium">수정</button>
-                <button type="button" onclick="deleteReservation(${idx})" class="bg-rose-100 hover:bg-rose-200 text-rose-700 px-2 py-1 rounded text-[11px] font-medium">삭제</button>
+                <button onclick="openModal(${idx})" class="bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-1 rounded text-[11px] font-medium">수정</button>
+                <button onclick="deleteReservation(${idx})" class="bg-rose-100 hover:bg-rose-200 text-rose-700 px-2 py-1 rounded text-[11px] font-medium">삭제</button>
               </div>
             </td>
           </tr>
@@ -548,26 +626,21 @@
     }
 
     function calcNights() {
-      const inVal = document.getElementById('formCheckIn').value;
-      const outVal = document.getElementById('formCheckOut').value;
-      if (inVal && outVal) {
-        const diff = (new Date(outVal) - new Date(inVal)) / (1000 * 60 * 60 * 24);
-        document.getElementById('formNights').value = diff > 0 ? diff : 0;
+      const inDate = document.getElementById('formCheckIn').value;
+      const outDate = document.getElementById('formCheckOut').value;
+      if (inDate && outDate) {
+        const diff = new Date(outDate) - new Date(inDate);
+        const nights = Math.ceil(diff / (1000 * 60 * 60 * 24));
+        document.getElementById('formNights').value = nights > 0 ? nights : 0;
       }
     }
 
     function openModal(index = -1) {
       document.getElementById('editIndex').value = index;
-      const companionTbody = document.getElementById('companionTableBody');
-      companionTbody.innerHTML = '';
+      document.getElementById('modalTitle').innerText = index >= 0 ? '예약 정보 수정' : '신규 예약 추가';
+      document.getElementById('companionTableBody').innerHTML = '';
 
-      if (index === -1) {
-        document.getElementById('modalTitle').innerText = '신규 예약 등록';
-        document.getElementById('resForm').reset();
-        document.getElementById('editIndex').value = -1;
-        document.getElementById('formStatus').value = 'NEW';
-      } else {
-        document.getElementById('modalTitle').innerText = '예약 정보 수정';
+      if (index >= 0) {
         const item = reservations[index];
         document.getElementById('formStatus').value = item.status || 'ACTIVE';
         document.getElementById('formName').value = item.name || '';
@@ -588,7 +661,12 @@
         if (item.companions && item.companions.length > 0) {
           item.companions.forEach(c => addCompanionRow(c));
         }
+      } else {
+        document.getElementById('resForm').reset();
+        document.getElementById('formStatus').value = 'NEW';
+        document.getElementById('editIndex').value = -1;
       }
+
       document.getElementById('resModal').classList.remove('hidden');
       document.getElementById('resModal').classList.add('flex');
     }
@@ -601,22 +679,21 @@
     function addCompanionRow(data = {}) {
       const tbody = document.getElementById('companionTableBody');
       const tr = document.createElement('tr');
-      tr.className = 'border-b';
+      tr.className = 'companion-row';
       tr.innerHTML = `
-        <td class="p-1.5"><input type="text" value="${data.name || ''}" class="comp-name w-full p-1 border rounded text-xs" placeholder="이름"></td>
-        <td class="p-1.5">
-          <select class="comp-gender w-full p-1 border rounded text-xs">
+        <td class="p-1"><input type="text" class="c-name w-full text-xs p-1 border rounded" value="${data.name || ''}"></td>
+        <td class="p-1">
+          <select class="c-gender w-full text-xs p-1 border rounded">
+            <option value="" ${!data.gender ? 'selected' : ''}>미선택</option>
             <option value="남" ${data.gender === '남' ? 'selected' : ''}>남</option>
             <option value="여" ${data.gender === '여' ? 'selected' : ''}>여</option>
           </select>
         </td>
-        <td class="p-1.5"><input type="date" value="${data.birth || ''}" class="comp-birth w-full p-1 border rounded text-xs"></td>
-        <td class="p-1.5"><input type="text" value="${data.passport || ''}" class="comp-passport w-full p-1 border rounded text-xs font-mono" placeholder="여권번호"></td>
-        <td class="p-1.5"><input type="date" value="${data.expiry || ''}" class="comp-expiry w-full p-1 border rounded text-xs"></td>
-        <td class="p-1.5 text-center"><input type="checkbox" ${data.isChild ? 'checked' : ''} class="comp-child rounded"></td>
-        <td class="p-1.5 text-center">
-          <button type="button" onclick="this.closest('tr').remove()" class="text-rose-600 hover:text-rose-800 font-bold px-2 py-0.5">✕</button>
-        </td>
+        <td class="p-1"><input type="date" class="c-birth w-full text-xs p-1 border rounded" value="${data.birth || ''}"></td>
+        <td class="p-1"><input type="text" class="c-passport w-full text-xs p-1 border rounded" value="${data.passport || ''}"></td>
+        <td class="p-1"><input type="date" class="c-expiry w-full text-xs p-1 border rounded" value="${data.expiry || ''}"></td>
+        <td class="p-1 text-center"><input type="checkbox" class="c-child" ${data.isChild ? 'checked' : ''}></td>
+        <td class="p-1 text-center"><button type="button" onclick="this.closest('tr').remove()" class="text-rose-500 hover:text-rose-700 font-bold">×</button></td>
       `;
       tbody.appendChild(tr);
     }
@@ -624,201 +701,100 @@
     async function handleFormSubmit(e) {
       e.preventDefault();
       const url = getApiUrl();
-      if (!url) return alert('Google Apps Script URL이 설정되지 않았습니다.');
+      if (!url) {
+        alert('Google Apps Script URL이 설정되지 않았습니다.');
+        return;
+      }
 
-      const idx = parseInt(document.getElementById('editIndex').value);
-      
-      const companionRows = document.querySelectorAll('#companionTableBody tr');
-      const companions = Array.from(companionRows).map(tr => ({
-        name: tr.querySelector('.comp-name').value,
-        gender: tr.querySelector('.comp-gender').value,
-        birth: tr.querySelector('.comp-birth').value,
-        passport: tr.querySelector('.comp-passport').value,
-        expiry: tr.querySelector('.comp-expiry').value,
-        isChild: tr.querySelector('.comp-child').checked
-      }));
+      const index = parseInt(document.getElementById('editIndex').value);
+      const companionRows = document.querySelectorAll('.companion-row');
+      const companions = [];
+
+      companionRows.forEach(row => {
+        companions.push({
+          name: row.querySelector('.c-name').value.trim(),
+          gender: row.querySelector('.c-gender').value,
+          birth: row.querySelector('.c-birth').value,
+          passport: row.querySelector('.c-passport').value.trim(),
+          expiry: row.querySelector('.c-expiry').value,
+          isChild: row.querySelector('.c-child').checked
+        });
+      });
+
+      const resData = {
+        status: document.getElementById('formStatus').value,
+        name: document.getElementById('formName').value.trim(),
+        checkIn: document.getElementById('formCheckIn').value,
+        checkOut: document.getElementById('formCheckOut').value,
+        nights: parseInt(document.getElementById('formNights').value) || 0,
+        pax: parseInt(document.getElementById('formPax').value) || 1,
+        room: parseInt(document.getElementById('formRoom').value) || 1,
+        lift: document.getElementById('formLift').value.trim(),
+        busIn: document.getElementById('formBusIn').value,
+        busOut: document.getElementById('formBusOut').value,
+        flightIn: document.getElementById('formFlightIn').value,
+        flightOut: document.getElementById('formFlightOut').value,
+        roomAllocation: document.getElementById('formRoomAllocation').value.trim(),
+        memo: document.getElementById('formMemo').value.trim(),
+        hotelMemo: document.getElementById('formHotelMemo').value.trim(),
+        companions: companions
+      };
 
       const payload = {
-        action: idx === -1 ? 'create' : 'update',
-        index: idx,
-        data: {
-          status: document.getElementById('formStatus').value,
-          name: document.getElementById('formName').value,
-          checkIn: document.getElementById('formCheckIn').value,
-          checkOut: document.getElementById('formCheckOut').value,
-          nights: parseInt(document.getElementById('formNights').value) || 0,
-          pax: parseInt(document.getElementById('formPax').value) || 1,
-          room: parseInt(document.getElementById('formRoom').value) || 1,
-          lift: document.getElementById('formLift').value,
-          busIn: document.getElementById('formBusIn').value,
-          busOut: document.getElementById('formBusOut').value,
-          flightIn: document.getElementById('formFlightIn').value,
-          flightOut: document.getElementById('formFlightOut').value,
-          roomAllocation: document.getElementById('formRoomAllocation').value,
-          memo: document.getElementById('formMemo').value,
-          hotelMemo: document.getElementById('formHotelMemo').value,
-          companions: companions
-        }
+        action: index >= 0 ? 'update' : 'create',
+        index: index,
+        data: resData
       };
 
       try {
+        const btn = document.getElementById('btnSubmit');
+        btn.disabled = true;
+        btn.innerText = '저장 중...';
+
         const res = await fetch(url, {
           method: 'POST',
-          headers: { 'Content-Type': 'text/plain' },
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: JSON.stringify(payload)
         });
-        
-        closeModal();
-        await loadData();
-        alert('성공적으로 저장되었습니다.');
+        const result = await res.json();
+
+        if (result.status === 'success') {
+          alert('저장되었습니다.');
+          closeModal();
+          loadData();
+        } else {
+          alert('저장 실패: ' + result.message);
+        }
       } catch (err) {
-        alert('저장 중 오류 발생: ' + err.message);
+        alert('오류 발생: ' + err.message);
+      } finally {
+        const btn = document.getElementById('btnSubmit');
+        btn.disabled = false;
+        btn.innerText = '저장하기';
       }
     }
 
     async function deleteReservation(index) {
       if (!confirm('정말 삭제하시겠습니까?')) return;
       const url = getApiUrl();
-      if (!url) return;
 
       try {
-        await fetch(url, {
+        const res = await fetch(url, {
           method: 'POST',
-          headers: { 'Content-Type': 'text/plain' },
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: JSON.stringify({ action: 'delete', index: index })
         });
-        await loadData();
-        alert('삭제되었습니다.');
+        const result = await res.json();
+
+        if (result.status === 'success') {
+          alert('삭제되었습니다.');
+          loadData();
+        } else {
+          alert('삭제 실패: ' + result.message);
+        }
       } catch (err) {
-        alert('삭제 도중 오류 발생: ' + err.message);
+        alert('삭제 중 오류가 발생했습니다: ' + err.message);
       }
-    }
-
-    function openDetailWindow(index) {
-      const item = reservations[index];
-      if (!item) return;
-
-      const detailWin = window.open('', '_blank', 'width=800,height=750,scrollbars=yes,resizable=yes');
-      const companions = item.companions || [];
-      
-      const companionsRowsHtml = companions.length > 0 ? companions.map((c, i) => `
-        <tr class="border-b hover:bg-gray-50 text-xs">
-          <td class="p-2.5 text-center font-medium text-gray-500">${i + 1}</td>
-          <td class="p-2.5 font-bold text-gray-800">${c.name || '-'}</td>
-          <td class="p-2.5 text-center">${c.gender || '-'}</td>
-          <td class="p-2.5 text-center">${c.birth || '-'}</td>
-          <td class="p-2.5 text-center font-mono">${c.passport || '-'}</td>
-          <td class="p-2.5 text-center">${c.expiry || '-'}</td>
-          <td class="p-2.5 text-center">${c.isChild ? '<span class="text-xs bg-amber-100 text-amber-800 font-bold px-1.5 py-0.5 rounded">소아</span>' : '성인'}</td>
-        </tr>
-      `).join('') : `<tr><td colspan="7" class="p-6 text-center text-gray-400 text-xs">등록된 동행자 정보가 없습니다.</td></tr>`;
-
-      const popupHtml = `
-        <!DOCTYPE html>
-        <html lang="ko">
-        <head>
-          <meta charset="UTF-8">
-          <title>${item.name || '예약자'} - 상세보기</title>
-          <script src="https://cdn.tailwindcss.com"><\/script>
-          <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-          <style>body { font-family: 'Noto Sans KR', sans-serif; }</style>
-        </head>
-        <body class="bg-gray-50 p-6 text-gray-800">
-          <div class="max-w-3xl mx-auto bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
-            <div class="bg-slate-800 text-white px-6 py-4 flex justify-between items-center">
-              <h2 class="text-base font-bold flex items-center gap-2">
-                <i class="fa-solid fa-file-invoice text-blue-400"></i> 예약 상세 및 동행자 명단
-              </h2>
-              <button onclick="downloadExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-2 rounded font-bold shadow flex items-center gap-1.5 transition">
-                <i class="fa-solid fa-file-excel text-sm"></i> 동행자 엑셀 다운로드
-              </button>
-            </div>
-
-            <div class="p-6 space-y-6">
-              <div>
-                <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">기본 예약 정보</h3>
-                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-4 rounded-lg border border-slate-200 text-xs">
-                  <div><span class="text-gray-500 block">예약자명</span><span class="font-bold text-slate-800 text-sm">${item.name || '-'}</span></div>
-                  <div><span class="text-gray-500 block">상태</span><span class="font-semibold text-blue-600">${item.status || 'ACTIVE'}</span></div>
-                  <div><span class="text-gray-500 block">체크인 ~ 체크아웃</span><span class="font-medium">${item.checkIn || '-'} ~ ${item.checkOut || '-'} (${item.nights || 0}박)</span></div>
-                  <div><span class="text-gray-500 block">인원 / 객실</span><span class="font-medium">${item.pax || 1}명 / ${item.room || 1}실</span></div>
-                  <div><span class="text-gray-500 block">송영버스(IN/OUT)</span><span class="font-medium">${item.busIn || '-'} / ${item.busOut || '-'}</span></div>
-                  <div><span class="text-gray-500 block">항공편(IN/OUT)</span><span class="font-medium">${item.flightIn || '-'} / ${item.flightOut || '-'}</span></div>
-                  <div><span class="text-gray-500 block">방배정</span><span class="font-medium">${item.roomAllocation || '-'}</span></div>
-                  <div><span class="text-gray-500 block">리프트권</span><span class="font-medium">${item.lift || '-'}</span></div>
-                </div>
-              </div>
-
-              <div>
-                <div class="flex justify-between items-center mb-3">
-                  <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider">동행자 명단 (${companions.length}명)</h3>
-                </div>
-                <div class="border rounded-lg overflow-hidden border-gray-200">
-                  <table class="w-full text-left border-collapse">
-                    <thead class="bg-slate-100 text-[11px] text-gray-600 font-bold border-b">
-                      <tr>
-                        <th class="p-2.5 text-center w-12">No</th>
-                        <th class="p-2.5">이름</th>
-                        <th class="p-2.5 text-center">성별</th>
-                        <th class="p-2.5 text-center">생년월일</th>
-                        <th class="p-2.5 text-center">여권번호</th>
-                        <th class="p-2.5 text-center">여권 만료일</th>
-                        <th class="p-2.5 text-center">구분</th>
-                      </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-200">
-                      ${companionsRowsHtml}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-
-            <div class="bg-gray-50 px-6 py-3 border-t text-right">
-              <button onclick="window.close()" class="px-4 py-1.5 text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 rounded font-medium">닫기</button>
-            </div>
-          </div>
-
-          <script>
-            function downloadExcel() {
-              const companions = ${JSON.stringify(companions)};
-              if (!companions || companions.length === 0) {
-                alert('다운로드할 동행자 정보가 없습니다.');
-                return;
-              }
-
-              let csvContent = "\\uFEFF";
-              csvContent += "번호,이름,성별,생년월일,여권번호,여권유효기간,구분\\n";
-
-              companions.forEach((c, idx) => {
-                const childStr = c.isChild ? '소아' : '성인';
-                const row = [
-                  idx + 1,
-                  \`"\${c.name || ''}"\`,
-                  \`"\${c.gender || ''}"\`,
-                  \`"\${c.birth || ''}"\`,
-                  \`"\${c.passport || ''}"\`,
-                  \`"\${c.expiry || ''}"\`,
-                  \`"\${childStr}"\`
-                ];
-                csvContent += row.join(",") + "\\n";
-              });
-
-              const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-              const url = URL.createObjectURL(blob);
-              const link = document.createElement("a");
-              link.setAttribute("href", url);
-              link.setAttribute("download", \`동행자명단_\${"${item.name || '예약'}"}.csv\`);
-              document.body.appendChild(link);
-              link.click();
-              document.body.removeChild(link);
-            }
-          <\/script>
-        </body>
-        </html>
-      `;
-      detailWin.document.write(popupHtml);
-      detailWin.document.close();
     }
   </script>
 </body>
