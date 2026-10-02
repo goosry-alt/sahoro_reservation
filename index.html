@@ -68,7 +68,7 @@
   <!-- Main Content -->
   <main class="max-w-7xl mx-auto px-4 py-6 space-y-6">
 
-    <!-- 1. 동일 날짜 & 버스 이용 인원 자동 집계 현황 (스크롤 적용 & 클릭 이벤트) -->
+    <!-- 1. 동일 날짜 & 버스 이용 인원 자동 집계 현황 -->
     <div class="bg-white rounded-lg shadow p-4 border border-gray-200">
       <div class="flex items-center justify-between mb-2">
         <h3 class="text-xs font-bold text-slate-700 uppercase flex items-center gap-1.5">
@@ -108,7 +108,7 @@
       </div>
     </div>
 
-    <!-- 3. 예약 현황 테이블 (틀고정 적용) -->
+    <!-- 3. 예약 현황 테이블 -->
     <div class="bg-white rounded-lg shadow overflow-hidden border border-gray-200">
       <div class="table-container">
         <table class="w-full text-xs text-left text-gray-600 border-collapse">
@@ -121,8 +121,8 @@
               <th class="p-2.5 border-b border-slate-600 min-w-[160px]">송영버스(IN/OUT)</th>
               <th class="p-2.5 border-b border-slate-600 min-w-[140px]">항공편(IN/OUT)</th>
               <th class="p-2.5 border-b border-slate-600 min-w-[90px]">방배정</th>
-              <th class="p-2.5 border-b border-slate-600 min-w-[160px]">동행자 정보</th>
-              <th class="p-2.5 border-b border-slate-600 min-w-[120px]">메모</th>
+              <th class="p-2.5 border-b border-slate-600 min-w-[120px]">고객 메모</th>
+              <th class="p-2.5 border-b border-slate-600 min-w-[120px]">호텔 메모</th>
               <th class="p-2.5 text-center border-b border-slate-600 min-w-[90px]">관리</th>
             </tr>
           </thead>
@@ -409,7 +409,6 @@
       }
     }
 
-    // 상태 요약 카운트 업데이트
     function updateSummary() {
       document.getElementById('newCount').innerText = reservations.filter(r => r.status === 'NEW').length + '건';
       document.getElementById('activeCount').innerText = reservations.filter(r => (r.status || 'ACTIVE') === 'ACTIVE').length + '건';
@@ -418,17 +417,14 @@
       document.getElementById('cancelledCount').innerText = reservations.filter(r => r.status === 'CANCELLED').length + '건';
     }
 
-    // 동일 날짜 & 동일 버스 이용 인원 집계 함수 (탑승자 목록 포함)
     function updateBusSummary() {
       busMapGlobal = {};
 
       reservations.forEach(r => {
-        // 취소/대기 건 제외
         if (r.status === 'CANCELLED' || r.status === 'WAITING') return;
 
         const pax = parseInt(r.pax) || 1;
 
-        // IN 버스 집계
         if (r.checkIn && r.busIn) {
           const key = `[IN] ${r.checkIn} | ${r.busIn}`;
           if (!busMapGlobal[key]) {
@@ -439,7 +435,6 @@
           busMapGlobal[key].passengers.push({ name: r.name || '미기재', pax: pax, status: r.status });
         }
 
-        // OUT 버스 집계
         if (r.checkOut && r.busOut) {
           const key = `[OUT] ${r.checkOut} | ${r.busOut}`;
           if (!busMapGlobal[key]) {
@@ -482,7 +477,6 @@
       }).join('');
     }
 
-    // 버스 탑승자 모달 열기
     function openBusModal(key) {
       const item = busMapGlobal[key];
       if (!item) return;
@@ -513,15 +507,9 @@
       document.getElementById('busPassengerModal').classList.remove('flex');
     }
 
-    /**
-     * 상태별 정렬 로직:
-     * 1. NEW, UPDATED, WAITING, CANCELLED 최상단 고정
-     * 2. ACTIVE (확정) 상태는 체크인 날짜 오름차순 정렬
-     */
     function getSortedReservations() {
       const pinnedOrder = { 'NEW': 1, 'UPDATED': 2, 'WAITING': 3, 'CANCELLED': 4 };
 
-      // 각 데이터의 원본 인덱스 보존
       const indexedList = reservations.map((item, originalIndex) => ({ ...item, originalIndex }));
 
       return indexedList.sort((a, b) => {
@@ -531,16 +519,13 @@
         const isAPinned = statusA in pinnedOrder;
         const isBPinned = statusB in pinnedOrder;
 
-        // 둘 다 상단 고정 상태인 경우 고정 순서대로
         if (isAPinned && isBPinned) {
           return pinnedOrder[statusA] - pinnedOrder[statusB];
         }
 
-        // 하나만 고정 상태인 경우 고정 상태를 상단으로
         if (isAPinned) return -1;
         if (isBPinned) return 1;
 
-        // 둘 다 확정(ACTIVE) 상태인 경우 체크인 날짜 오름차순 정렬
         const dateA = a.checkIn ? new Date(a.checkIn) : new Date('9999-12-31');
         const dateB = b.checkIn ? new Date(b.checkIn) : new Date('9999-12-31');
 
@@ -577,12 +562,6 @@
           statusText = '취소';
         }
 
-        const companions = item.companions || [];
-        const companionText = companions.map(c => {
-          const genderText = c.gender ? `(${c.gender})` : '';
-          return `${c.name || '미기재'}${genderText}`;
-        }).join(', ');
-
         return `
           <tr class="hover:bg-gray-50 border-b">
             <td class="p-2 text-center sticky-col-1">
@@ -608,11 +587,11 @@
               <div>OUT: ${item.flightOut || '-'}</div>
             </td>
             <td class="p-2">${item.roomAllocation || '-'}</td>
-            <td class="p-2 max-w-[150px] truncate" title="${companionText}">
-              ${companionText || '<span class="text-gray-300">없음</span>'}
-            </td>
             <td class="p-2">
               <div class="truncate max-w-[120px]" title="${item.memo || ''}">${item.memo || '-'}</div>
+            </td>
+            <td class="p-2">
+              <div class="truncate max-w-[120px]" title="${item.hotelMemo || ''}">${item.hotelMemo || '-'}</div>
             </td>
             <td class="p-2 text-center">
               <div class="flex justify-center gap-1">
