@@ -213,8 +213,8 @@
             </div>
             <div>
               <label class="block text-xs font-bold text-gray-600 mb-1">인원수 (PAX)</label>
-              <!-- 인원수 변경 시 동행인 행 수 연동 -->
-              <input type="number" id="formPax" min="1" value="1" oninput="updateCompanionsByPax()" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+              <!-- 인원수 변경 시 동행인 행 수 동일하게 연동 -->
+              <input type="number" id="formPax" min="0" value="1" oninput="updateCompanionsByPax()" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
             </div>
             <div>
               <label class="block text-xs font-bold text-gray-600 mb-1">객실수</label>
@@ -669,16 +669,16 @@
 
     /* --- 동행인 제어 기능 --- */
 
-    // 인원수(PAX) 입력 값에 따라 동행인 행 수를 맞춤 (대표 예약자 제외 = PAX - 1)
+    // 인원수(PAX) 입력 값과 동일한 개수로 동행인 행 수 동기화
     function updateCompanionsByPax() {
       const paxInput = document.getElementById('formPax');
-      let pax = parseInt(paxInput.value) || 1;
-      if (pax < 1) {
-        pax = 1;
-        paxInput.value = 1;
+      let pax = parseInt(paxInput.value);
+      if (isNaN(pax) || pax < 0) {
+        pax = 0;
+        paxInput.value = 0;
       }
 
-      const targetCompanionCount = Math.max(0, pax - 1);
+      const targetCompanionCount = pax;
       const tbody = document.getElementById('companionTableBody');
       let currentRows = tbody.querySelectorAll('.companion-row');
 
@@ -698,7 +698,7 @@
     // [+ 동행인 추가] 버튼 클릭 시
     function handleAddCompanionClick() {
       const paxInput = document.getElementById('formPax');
-      let pax = parseInt(paxInput.value) || 1;
+      let pax = parseInt(paxInput.value) || 0;
       paxInput.value = pax + 1;
       addCompanionRow();
     }
@@ -726,12 +726,12 @@
       tbody.appendChild(tr);
     }
 
-    // 동행인 행 삭제 함수 (삭제 시 인원수도 줄어듦)
+    // 동행인 행 삭제 함수 (삭제 시 인원수도 함께 줄어듬)
     function removeCompanionRow(btn) {
       btn.closest('tr').remove();
       const paxInput = document.getElementById('formPax');
-      let pax = parseInt(paxInput.value) || 1;
-      if (pax > 1) {
+      let pax = parseInt(paxInput.value) || 0;
+      if (pax > 0) {
         paxInput.value = pax - 1;
       }
     }
@@ -765,7 +765,7 @@
         checkIn: document.getElementById('formCheckIn').value,
         checkOut: document.getElementById('formCheckOut').value,
         nights: parseInt(document.getElementById('formNights').value) || 0,
-        pax: parseInt(document.getElementById('formPax').value) || 1,
+        pax: parseInt(document.getElementById('formPax').value) || 0,
         room: parseInt(document.getElementById('formRoom').value) || 1,
         lift: document.getElementById('formLift').value.trim(),
         busIn: document.getElementById('formBusIn').value,
