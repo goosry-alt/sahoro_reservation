@@ -341,60 +341,40 @@
   <script>
     let reservations = [];
 
-    // DOM 로드 완료 후 안전하게 이벤트 바인딩
+    // DOM 로드 완료 후 이벤트 바인딩
     document.addEventListener('DOMContentLoaded', function() {
-      // 1. 저장된 URL 불러오기
       const savedUrl = localStorage.getItem('scriptApiUrl');
       if (savedUrl) {
         document.getElementById('scriptUrl').value = savedUrl;
         loadData();
       }
 
-      // 2. 주요 버튼 이벤트 리스너 직접 바인딩
       const saveBtn = document.getElementById('btnSaveUrl');
-      if (saveBtn) {
-        saveBtn.addEventListener('click', saveApiUrlHandler);
-      }
+      if (saveBtn) saveBtn.addEventListener('click', saveApiUrlHandler);
 
       const loadBtn = document.getElementById('btnLoadData');
-      if (loadBtn) {
-        loadBtn.addEventListener('click', loadData);
-      }
+      if (loadBtn) loadBtn.addEventListener('click', loadData);
 
       const newResBtn = document.getElementById('btnNewRes');
-      if (newResBtn) {
-        newResBtn.addEventListener('click', function() { openModal(-1); });
-      }
+      if (newResBtn) newResBtn.addEventListener('click', function() { openModal(-1); });
 
       const resForm = document.getElementById('resForm');
-      if (resForm) {
-        resForm.addEventListener('submit', handleFormSubmit);
-      }
+      if (resForm) resForm.addEventListener('submit', handleFormSubmit);
 
       const addCompBtn = document.getElementById('btnAddCompanion');
-      if (addCompBtn) {
-        addCompBtn.addEventListener('click', function() { addCompanionRow(); });
-      }
+      if (addCompBtn) addCompBtn.addEventListener('click', function() { addCompanionRow(); });
 
       document.getElementById('formCheckIn').addEventListener('change', calcNights);
       document.getElementById('formCheckOut').addEventListener('change', calcNights);
     });
 
-    // URL 저장 핸들러
     function saveApiUrlHandler(e) {
       if (e) e.preventDefault();
-      
       const inputEl = document.getElementById('scriptUrl');
-      if (!inputEl) {
-        alert('URL 입력창 요소를 찾을 수 없습니다.');
-        return;
-      }
+      if (!inputEl) return alert('URL 입력창 요소를 찾을 수 없습니다.');
 
       const url = inputEl.value.trim();
-      if (!url) {
-        alert('Google Apps Script URL을 입력해주세요.');
-        return;
-      }
+      if (!url) return alert('Google Apps Script URL을 입력해주세요.');
 
       try {
         localStorage.setItem('scriptApiUrl', url);
@@ -446,7 +426,6 @@
 
       reservations.forEach(r => {
         if (r.status === 'CANCELLED' || r.status === 'WAITING') return;
-
         const pax = parseInt(r.pax) || 1;
 
         if (r.checkIn && r.busIn) {
@@ -568,13 +547,160 @@
       }).join('');
     }
 
+    function calcNights() {
+      const inVal = document.getElementById('formCheckIn').value;
+      const outVal = document.getElementById('formCheckOut').value;
+      if (inVal && outVal) {
+        const diff = (new Date(outVal) - new Date(inVal)) / (1000 * 60 * 60 * 24);
+        document.getElementById('formNights').value = diff > 0 ? diff : 0;
+      }
+    }
+
+    function openModal(index = -1) {
+      document.getElementById('editIndex').value = index;
+      const companionTbody = document.getElementById('companionTableBody');
+      companionTbody.innerHTML = '';
+
+      if (index === -1) {
+        document.getElementById('modalTitle').innerText = '신규 예약 등록';
+        document.getElementById('resForm').reset();
+        document.getElementById('editIndex').value = -1;
+        document.getElementById('formStatus').value = 'NEW';
+      } else {
+        document.getElementById('modalTitle').innerText = '예약 정보 수정';
+        const item = reservations[index];
+        document.getElementById('formStatus').value = item.status || 'ACTIVE';
+        document.getElementById('formName').value = item.name || '';
+        document.getElementById('formCheckIn').value = item.checkIn || '';
+        document.getElementById('formCheckOut').value = item.checkOut || '';
+        document.getElementById('formNights').value = item.nights || 0;
+        document.getElementById('formPax').value = item.pax || 1;
+        document.getElementById('formRoom').value = item.room || 1;
+        document.getElementById('formLift').value = item.lift || '';
+        document.getElementById('formBusIn').value = item.busIn || '';
+        document.getElementById('formBusOut').value = item.busOut || '';
+        document.getElementById('formFlightIn').value = item.flightIn || '';
+        document.getElementById('formFlightOut').value = item.flightOut || '';
+        document.getElementById('formRoomAllocation').value = item.roomAllocation || '';
+        document.getElementById('formMemo').value = item.memo || '';
+        document.getElementById('formHotelMemo').value = item.hotelMemo || '';
+
+        if (item.companions && item.companions.length > 0) {
+          item.companions.forEach(c => addCompanionRow(c));
+        }
+      }
+      document.getElementById('resModal').classList.remove('hidden');
+      document.getElementById('resModal').classList.add('flex');
+    }
+
+    function closeModal() {
+      document.getElementById('resModal').classList.add('hidden');
+      document.getElementById('resModal').classList.remove('flex');
+    }
+
+    function addCompanionRow(data = {}) {
+      const tbody = document.getElementById('companionTableBody');
+      const tr = document.createElement('tr');
+      tr.className = 'border-b';
+      tr.innerHTML = `
+        <td class="p-1.5"><input type="text" value="${data.name || ''}" class="comp-name w-full p-1 border rounded text-xs" placeholder="이름"></td>
+        <td class="p-1.5">
+          <select class="comp-gender w-full p-1 border rounded text-xs">
+            <option value="남" ${data.gender === '남' ? 'selected' : ''}>남</option>
+            <option value="여" ${data.gender === '여' ? 'selected' : ''}>여</option>
+          </select>
+        </td>
+        <td class="p-1.5"><input type="date" value="${data.birth || ''}" class="comp-birth w-full p-1 border rounded text-xs"></td>
+        <td class="p-1.5"><input type="text" value="${data.passport || ''}" class="comp-passport w-full p-1 border rounded text-xs font-mono" placeholder="여권번호"></td>
+        <td class="p-1.5"><input type="date" value="${data.expiry || ''}" class="comp-expiry w-full p-1 border rounded text-xs"></td>
+        <td class="p-1.5 text-center"><input type="checkbox" ${data.isChild ? 'checked' : ''} class="comp-child rounded"></td>
+        <td class="p-1.5 text-center">
+          <button type="button" onclick="this.closest('tr').remove()" class="text-rose-600 hover:text-rose-800 font-bold px-2 py-0.5">✕</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    }
+
+    async function handleFormSubmit(e) {
+      e.preventDefault();
+      const url = getApiUrl();
+      if (!url) return alert('Google Apps Script URL이 설정되지 않았습니다.');
+
+      const idx = parseInt(document.getElementById('editIndex').value);
+      
+      const companionRows = document.querySelectorAll('#companionTableBody tr');
+      const companions = Array.from(companionRows).map(tr => ({
+        name: tr.querySelector('.comp-name').value,
+        gender: tr.querySelector('.comp-gender').value,
+        birth: tr.querySelector('.comp-birth').value,
+        passport: tr.querySelector('.comp-passport').value,
+        expiry: tr.querySelector('.comp-expiry').value,
+        isChild: tr.querySelector('.comp-child').checked
+      }));
+
+      const payload = {
+        action: idx === -1 ? 'create' : 'update',
+        index: idx,
+        data: {
+          status: document.getElementById('formStatus').value,
+          name: document.getElementById('formName').value,
+          checkIn: document.getElementById('formCheckIn').value,
+          checkOut: document.getElementById('formCheckOut').value,
+          nights: parseInt(document.getElementById('formNights').value) || 0,
+          pax: parseInt(document.getElementById('formPax').value) || 1,
+          room: parseInt(document.getElementById('formRoom').value) || 1,
+          lift: document.getElementById('formLift').value,
+          busIn: document.getElementById('formBusIn').value,
+          busOut: document.getElementById('formBusOut').value,
+          flightIn: document.getElementById('formFlightIn').value,
+          flightOut: document.getElementById('formFlightOut').value,
+          roomAllocation: document.getElementById('formRoomAllocation').value,
+          memo: document.getElementById('formMemo').value,
+          hotelMemo: document.getElementById('formHotelMemo').value,
+          companions: companions
+        }
+      };
+
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify(payload)
+        });
+        
+        closeModal();
+        await loadData();
+        alert('성공적으로 저장되었습니다.');
+      } catch (err) {
+        alert('저장 중 오류 발생: ' + err.message);
+      }
+    }
+
+    async function deleteReservation(index) {
+      if (!confirm('정말 삭제하시겠습니까?')) return;
+      const url = getApiUrl();
+      if (!url) return;
+
+      try {
+        await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ action: 'delete', index: index })
+        });
+        await loadData();
+        alert('삭제되었습니다.');
+      } catch (err) {
+        alert('삭제 도중 오류 발생: ' + err.message);
+      }
+    }
+
     function openDetailWindow(index) {
       const item = reservations[index];
       if (!item) return;
 
       const detailWin = window.open('', '_blank', 'width=800,height=750,scrollbars=yes,resizable=yes');
-      
       const companions = item.companions || [];
+      
       const companionsRowsHtml = companions.length > 0 ? companions.map((c, i) => `
         <tr class="border-b hover:bg-gray-50 text-xs">
           <td class="p-2.5 text-center font-medium text-gray-500">${i + 1}</td>
@@ -682,7 +808,7 @@
               const url = URL.createObjectURL(blob);
               const link = document.createElement("a");
               link.setAttribute("href", url);
-              link.setAttribute("download", \`동행자명단_\${"${item.name \vert{}\vert{} '예약자'}"}_\${"${item.checkIn || ''}"}.csv\`);
+              link.setAttribute("download", \`동행자명단_\${"${item.name || '예약'}"}.csv\`);
               document.body.appendChild(link);
               link.click();
               document.body.removeChild(link);
@@ -691,182 +817,8 @@
         </body>
         </html>
       `;
-
-      detailWin.document.open();
       detailWin.document.write(popupHtml);
       detailWin.document.close();
-    }
-
-    function calcNights() {
-      const inDate = document.getElementById('formCheckIn').value;
-      const outDate = document.getElementById('formCheckOut').value;
-      if (inDate && outDate) {
-        const diff = new Date(outDate) - new Date(inDate);
-        const nights = Math.ceil(diff / (1000 * 60 * 60 * 24));
-        document.getElementById('formNights').value = nights > 0 ? nights : 0;
-      }
-    }
-
-    function openModal(index = -1) {
-      document.getElementById('editIndex').value = index;
-      document.getElementById('modalTitle').innerText = index >= 0 ? '예약 정보 수정' : '신규 예약 추가';
-      document.getElementById('companionTableBody').innerHTML = '';
-
-      if (index >= 0) {
-        const item = reservations[index];
-        document.getElementById('formStatus').value = item.status || 'ACTIVE';
-        document.getElementById('formName').value = item.name || '';
-        document.getElementById('formCheckIn').value = item.checkIn || '';
-        document.getElementById('formCheckOut').value = item.checkOut || '';
-        document.getElementById('formNights').value = item.nights || 0;
-        document.getElementById('formPax').value = item.pax || 1;
-        document.getElementById('formRoom').value = item.room || 1;
-        document.getElementById('formLift').value = item.lift || '';
-        document.getElementById('formBusIn').value = item.busIn || '';
-        document.getElementById('formBusOut').value = item.busOut || '';
-        document.getElementById('formFlightIn').value = item.flightIn || '';
-        document.getElementById('formFlightOut').value = item.flightOut || '';
-        document.getElementById('formRoomAllocation').value = item.roomAllocation || '';
-        document.getElementById('formMemo').value = item.memo || '';
-        document.getElementById('formHotelMemo').value = item.hotelMemo || '';
-
-        if (item.companions && item.companions.length > 0) {
-          item.companions.forEach(c => addCompanionRow(c));
-        }
-      } else {
-        document.getElementById('resForm').reset();
-        document.getElementById('formStatus').value = 'NEW';
-        document.getElementById('editIndex').value = -1;
-      }
-
-      document.getElementById('resModal').classList.remove('hidden');
-      document.getElementById('resModal').classList.add('flex');
-    }
-
-    function closeModal() {
-      document.getElementById('resModal').classList.add('hidden');
-      document.getElementById('resModal').classList.remove('flex');
-    }
-
-    function addCompanionRow(data = {}) {
-      const tbody = document.getElementById('companionTableBody');
-      const tr = document.createElement('tr');
-      tr.className = 'companion-row';
-      tr.innerHTML = `
-        <td class="p-1"><input type="text" class="c-name w-full text-xs p-1 border rounded" value="${data.name || ''}"></td>
-        <td class="p-1">
-          <select class="c-gender w-full text-xs p-1 border rounded">
-            <option value="" ${!data.gender ? 'selected' : ''}>미선택</option>
-            <option value="남" ${data.gender === '남' ? 'selected' : ''}>남</option>
-            <option value="여" ${data.gender === '여' ? 'selected' : ''}>여</option>
-          </select>
-        </td>
-        <td class="p-1"><input type="date" class="c-birth w-full text-xs p-1 border rounded" value="${data.birth || ''}"></td>
-        <td class="p-1"><input type="text" class="c-passport w-full text-xs p-1 border rounded" value="${data.passport || ''}"></td>
-        <td class="p-1"><input type="date" class="c-expiry w-full text-xs p-1 border rounded" value="${data.expiry || ''}"></td>
-        <td class="p-1 text-center"><input type="checkbox" class="c-child" ${data.isChild ? 'checked' : ''}></td>
-        <td class="p-1 text-center"><button type="button" onclick="this.closest('tr').remove()" class="text-rose-500 hover:text-rose-700 font-bold">×</button></td>
-      `;
-      tbody.appendChild(tr);
-    }
-
-    async function handleFormSubmit(e) {
-      if (e && e.preventDefault) e.preventDefault();
-      
-      const url = getApiUrl();
-      if (!url) {
-        alert('Google Apps Script URL이 설정되지 않았습니다.');
-        return;
-      }
-
-      const index = parseInt(document.getElementById('editIndex').value);
-      const companionRows = document.querySelectorAll('.companion-row');
-      const companions = [];
-
-      companionRows.forEach(row => {
-        companions.push({
-          name: row.querySelector('.c-name').value.trim(),
-          gender: row.querySelector('.c-gender').value,
-          birth: row.querySelector('.c-birth').value,
-          passport: row.querySelector('.c-passport').value.trim(),
-          expiry: row.querySelector('.c-expiry').value,
-          isChild: row.querySelector('.c-child').checked
-        });
-      });
-
-      const resData = {
-        status: document.getElementById('formStatus').value,
-        name: document.getElementById('formName').value.trim(),
-        checkIn: document.getElementById('formCheckIn').value,
-        checkOut: document.getElementById('formCheckOut').value,
-        nights: parseInt(document.getElementById('formNights').value) || 0,
-        pax: parseInt(document.getElementById('formPax').value) || 1,
-        room: parseInt(document.getElementById('formRoom').value) || 1,
-        lift: document.getElementById('formLift').value.trim(),
-        busIn: document.getElementById('formBusIn').value,
-        busOut: document.getElementById('formBusOut').value,
-        flightIn: document.getElementById('formFlightIn').value,
-        flightOut: document.getElementById('formFlightOut').value,
-        roomAllocation: document.getElementById('formRoomAllocation').value.trim(),
-        memo: document.getElementById('formMemo').value.trim(),
-        hotelMemo: document.getElementById('formHotelMemo').value.trim(),
-        companions: companions
-      };
-
-      const payload = {
-        action: index >= 0 ? 'update' : 'create',
-        index: index,
-        data: resData
-      };
-
-      const btn = document.getElementById('btnSubmit');
-      try {
-        btn.disabled = true;
-        btn.innerText = '저장 중...';
-
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify(payload)
-        });
-        const result = await res.json();
-
-        if (result.status === 'success') {
-          alert('저장되었습니다.');
-          closeModal();
-          loadData();
-        } else {
-          alert('저장 실패: ' + result.message);
-        }
-      } catch (err) {
-        alert('오류 발생: ' + err.message);
-      } finally {
-        btn.disabled = false;
-        btn.innerText = '저장하기';
-      }
-    }
-
-    async function deleteReservation(index) {
-      if (!confirm('정말 삭제하시겠습니까?')) return;
-      const url = getApiUrl();
-
-      try {
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({ action: 'delete', index: index })
-        });
-        const result = await res.json();
-
-        if (result.status === 'success') {
-          alert('삭제되었습니다.');
-          loadData();
-        } else {
-          alert('삭제 실패: ' + result.message);
-        }
-      } catch (err) {
-        alert('삭제 중 오류가 발생했습니다: ' + err.message);
-      }
     }
   </script>
 </body>
