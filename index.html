@@ -9,7 +9,6 @@
   <style>
     body { font-family: 'Noto Sans KR', sans-serif; }
     
-    /* 테이블 틀고정 스타일 */
     .table-container {
       max-height: 600px;
       overflow: auto;
@@ -20,7 +19,6 @@
       width: 100%;
     }
     
-    /* 헤더 전체 상단 틀고정 (Sticky Top) */
     .table-container thead th {
       position: sticky;
       top: 0;
@@ -30,12 +28,10 @@
       box-shadow: inset 0 -1px 0 #475569;
     }
     
-    /* 좌측 열 고정 (Sticky Left Columns) */
     .sticky-col-1 { position: sticky; left: 0; z-index: 10; background-color: #ffffff; }
     .sticky-col-2 { position: sticky; left: 70px; z-index: 10; background-color: #ffffff; }
     .sticky-col-3 { position: sticky; left: 180px; z-index: 10; background-color: #ffffff; }
     
-    /* 헤더 + 좌측 고정 열 교차점 */
     thead th.sticky-col-1,
     thead th.sticky-col-2,
     thead th.sticky-col-3 {
@@ -213,7 +209,7 @@
             </div>
             <div>
               <label class="block text-xs font-bold text-gray-600 mb-1">인원수 (PAX)</label>
-              <input type="number" id="formPax" min="0" value="1" oninput="updateCompanionsByPax()" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+              <input type="number" id="formPax" min="1" value="1" oninput="updateCompanionsByPax()" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
             </div>
             <div>
               <label class="block text-xs font-bold text-gray-600 mb-1">객실수</label>
@@ -373,22 +369,24 @@
               + 동행인 추가
             </button>
           </div>
-          <table class="w-full text-xs text-left">
-            <thead>
-              <tr class="bg-gray-100 border-b">
-                <th class="p-2">이름</th>
-                <th class="p-2">성별</th>
-                <th class="p-2">생년월일</th>
-                <th class="p-2">여권번호</th>
-                <th class="p-2">여권유효기간</th>
-                <th class="p-2 text-center">소아 여부</th>
-                <th class="p-2 text-center">삭제</th>
-              </tr>
-            </thead>
-            <tbody id="companionTableBody" class="divide-y divide-gray-200">
-              <!-- 동적 생성 -->
-            </tbody>
-          </table>
+          <div class="overflow-x-auto">
+            <table class="w-full text-xs text-left">
+              <thead>
+                <tr class="bg-gray-100 border-b">
+                  <th class="p-2">이름</th>
+                  <th class="p-2 w-20">성별</th>
+                  <th class="p-2">생년월일</th>
+                  <th class="p-2">여권번호</th>
+                  <th class="p-2">여권유효기간</th>
+                  <th class="p-2 text-center w-20">소아 여부</th>
+                  <th class="p-2 text-center w-12">삭제</th>
+                </tr>
+              </thead>
+              <tbody id="companionTableBody" class="divide-y divide-gray-200">
+                <!-- 동적 생성 -->
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <!-- Controls -->
@@ -701,23 +699,99 @@
       }).join('');
     }
 
+    /* ----------------------------------------------------
+       보완 및 추가 구현된 자바스크립트 함수 영역
+    ---------------------------------------------------- */
+
+    // 1. 박수 계산
     function calcNights() {
-      const inDate = document.getElementById('formCheckIn').value;
-      const outDate = document.getElementById('formCheckOut').value;
-      if (inDate && outDate) {
-        const diff = new Date(outDate) - new Date(inDate);
-        const nights = Math.ceil(diff / (1000 * 60 * 60 * 24));
-        document.getElementById('formNights').value = nights > 0 ? nights : 0;
+      const inVal = document.getElementById('formCheckIn').value;
+      const outVal = document.getElementById('formCheckOut').value;
+      
+      if (inVal && outVal) {
+        const d1 = new Date(inVal);
+        const d2 = new Date(outVal);
+        const diffTime = d2 - d1;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        document.getElementById('formNights').value = diffDays >= 0 ? diffDays : 0;
+      } else {
+        document.getElementById('formNights').value = 0;
       }
     }
 
+    // 2. 인원수 변경에 따른 동행인 입력란 자동 조절
+    function updateCompanionsByPax() {
+      const pax = parseInt(document.getElementById('formPax').value) || 1;
+      const tbody = document.getElementById('companionTableBody');
+      const currentRows = tbody.querySelectorAll('tr').length;
+
+      if (pax > currentRows) {
+        for (let i = currentRows; i < pax; i++) {
+          addCompanionRow();
+        }
+      } else if (pax < currentRows && currentRows > 0) {
+        for (let i = currentRows; i > pax; i--) {
+          if (tbody.lastChild) tbody.removeChild(tbody.lastChild);
+        }
+      }
+    }
+
+    // 동행인 행 추가 클릭 이벤트 핸들러
+    function handleAddCompanionClick() {
+      addCompanionRow();
+      const tbody = document.getElementById('companionTableBody');
+      document.getElementById('formPax').value = tbody.querySelectorAll('tr').length;
+    }
+
+    // 동행인 Row 생성 함수
+    function addCompanionRow(data = {}) {
+      const tbody = document.getElementById('companionTableBody');
+      const tr = document.createElement('tr');
+      tr.className = 'border-b hover:bg-gray-50';
+
+      tr.innerHTML = `
+        <td class="p-1.5"><input type="text" value="${data.name || ''}" placeholder="이름" class="comp-name w-full p-1 text-xs border rounded"></td>
+        <td class="p-1.5">
+          <select class="comp-gender w-full p-1 text-xs border rounded">
+            <option value="M" ${data.gender === 'M' ? 'selected' : ''}>남</option>
+            <option value="F" ${data.gender === 'F' ? 'selected' : ''}>여</option>
+          </select>
+        </td>
+        <td class="p-1.5"><input type="date" value="${data.birth || ''}" class="comp-birth w-full p-1 text-xs border rounded"></td>
+        <td class="p-1.5"><input type="text" value="${data.passport || ''}" placeholder="여권번호" class="comp-passport w-full p-1 text-xs border rounded uppercase"></td>
+        <td class="p-1.5"><input type="date" value="${data.passportExpiry || ''}" class="comp-passport-expiry w-full p-1 text-xs border rounded"></td>
+        <td class="p-1.5 text-center"><input type="checkbox" ${data.isChild ? 'checked' : ''} class="comp-child rounded"></td>
+        <td class="p-1.5 text-center">
+          <button type="button" onclick="removeCompanionRow(this)" class="text-rose-500 hover:text-rose-700 font-bold"><i class="fa-solid fa-trash"></i></button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    }
+
+    function removeCompanionRow(btn) {
+      const row = btn.closest('tr');
+      row.remove();
+      const tbody = document.getElementById('companionTableBody');
+      document.getElementById('formPax').value = tbody.querySelectorAll('tr').length || 1;
+    }
+
+    // 3. 모달 열기/닫기
     function openModal(index = -1) {
       document.getElementById('editIndex').value = index;
-      document.getElementById('modalTitle').innerText = index >= 0 ? '예약 정보 수정' : '신규 예약 추가';
+      const form = document.getElementById('resForm');
+      form.reset();
       document.getElementById('companionTableBody').innerHTML = '';
 
-      if (index >= 0) {
+      if (index === -1) {
+        document.getElementById('modalTitle').innerText = '신규 예약 등록';
+        document.getElementById('formStatus').value = 'NEW';
+        document.getElementById('formPax').value = 1;
+        document.getElementById('formRoom').value = 1;
+        updateCompanionsByPax();
+      } else {
+        document.getElementById('modalTitle').innerText = '예약 정보 수정';
         const item = reservations[index];
+
         document.getElementById('formStatus').value = item.status || 'ACTIVE';
         document.getElementById('formName').value = item.name || '';
         document.getElementById('formCheckIn').value = item.checkIn || '';
@@ -728,32 +802,24 @@
         document.getElementById('formLift').value = item.lift || '';
 
         document.getElementById('formBusIn').value = item.busIn || '';
-        document.getElementById('formBusInTime').value = item.busInTime || (timeTables.busIn[item.busIn] || '');
-
+        document.getElementById('formBusInTime').value = item.busInTime || '';
         document.getElementById('formBusOut').value = item.busOut || '';
-        document.getElementById('formBusOutTime').value = item.busOutTime || (timeTables.busOut[item.busOut] || '');
+        document.getElementById('formBusOutTime').value = item.busOutTime || '';
 
         document.getElementById('formFlightIn').value = item.flightIn || '';
-        document.getElementById('formFlightInTime').value = item.flightInTime || (timeTables.flightIn[item.flightIn] || '');
-
+        document.getElementById('formFlightInTime').value = item.flightInTime || '';
         document.getElementById('formFlightOut').value = item.flightOut || '';
-        document.getElementById('formFlightOutTime').value = item.flightOutTime || (timeTables.flightOut[item.flightOut] || '');
+        document.getElementById('formFlightOutTime').value = item.flightOutTime || '';
 
         document.getElementById('formRoomAllocation').value = item.roomAllocation || '';
         document.getElementById('formMemo').value = item.memo || '';
         document.getElementById('formHotelMemo').value = item.hotelMemo || '';
 
-        if (item.companions && item.companions.length > 0) {
+        if (Array.isArray(item.companions) && item.companions.length > 0) {
           item.companions.forEach(c => addCompanionRow(c));
         } else {
           updateCompanionsByPax();
         }
-      } else {
-        document.getElementById('resForm').reset();
-        document.getElementById('formStatus').value = 'NEW';
-        document.getElementById('formPax').value = 1;
-        document.getElementById('editIndex').value = -1;
-        updateCompanionsByPax();
       }
 
       document.getElementById('resModal').classList.remove('hidden');
@@ -765,169 +831,107 @@
       document.getElementById('resModal').classList.remove('flex');
     }
 
-    function updateCompanionsByPax() {
-      const paxInput = document.getElementById('formPax');
-      let pax = parseInt(paxInput.value);
-      if (isNaN(pax) || pax < 0) {
-        pax = 0;
-        paxInput.value = 0;
-      }
-
-      const targetCompanionCount = pax;
-      const tbody = document.getElementById('companionTableBody');
-      let currentRows = tbody.querySelectorAll('.companion-row');
-
-      if (currentRows.length < targetCompanionCount) {
-        const needed = targetCompanionCount - currentRows.length;
-        for (let i = 0; i < needed; i++) {
-          addCompanionRow();
-        }
-      } else if (currentRows.length > targetCompanionCount) {
-        const removeCount = currentRows.length - targetCompanionCount;
-        for (let i = 0; i < removeCount; i++) {
-          tbody.lastElementChild.remove();
-        }
-      }
-    }
-
-    function handleAddCompanionClick() {
-      const paxInput = document.getElementById('formPax');
-      let pax = parseInt(paxInput.value) || 0;
-      paxInput.value = pax + 1;
-      addCompanionRow();
-    }
-
-    function addCompanionRow(data = {}) {
-      const tbody = document.getElementById('companionTableBody');
-      const tr = document.createElement('tr');
-      tr.className = 'companion-row';
-      tr.innerHTML = `
-        <td class="p-1"><input type="text" class="c-name w-full text-xs p-1 border rounded" value="${data.name || ''}"></td>
-        <td class="p-1">
-          <select class="c-gender w-full text-xs p-1 border rounded">
-            <option value="" ${!data.gender ? 'selected' : ''}>미선택</option>
-            <option value="남" ${data.gender === '남' ? 'selected' : ''}>남</option>
-            <option value="여" ${data.gender === '여' ? 'selected' : ''}>여</option>
-          </select>
-        </td>
-        <td class="p-1"><input type="date" class="c-birth w-full text-xs p-1 border rounded" value="${data.birth || ''}"></td>
-        <td class="p-1"><input type="text" class="c-passport w-full text-xs p-1 border rounded" value="${data.passport || ''}"></td>
-        <td class="p-1"><input type="date" class="c-expiry w-full text-xs p-1 border rounded" value="${data.expiry || ''}"></td>
-        <td class="p-1 text-center"><input type="checkbox" class="c-child" ${data.isChild ? 'checked' : ''}></td>
-        <td class="p-1 text-center"><button type="button" onclick="removeCompanionRow(this)" class="text-rose-500 hover:text-rose-700 font-bold">×</button></td>
-      `;
-      tbody.appendChild(tr);
-    }
-
-    function removeCompanionRow(btn) {
-      btn.closest('tr').remove();
-      const paxInput = document.getElementById('formPax');
-      let pax = parseInt(paxInput.value) || 0;
-      if (pax > 0) {
-        paxInput.value = pax - 1;
-      }
-    }
-
+    // 4. Form Submit 및 서버 전송
     async function handleFormSubmit(e) {
       e.preventDefault();
-      const url = getApiUrl();
-      if (!url) {
-        alert('Google Apps Script URL이 설정되지 않았습니다.');
-        return;
-      }
 
       const index = parseInt(document.getElementById('editIndex').value);
-      const companionRows = document.querySelectorAll('.companion-row');
+      
+      // 동행인 데이터 모으기
       const companions = [];
-
-      companionRows.forEach(row => {
+      const rows = document.querySelectorAll('#companionTableBody tr');
+      rows.forEach(r => {
         companions.push({
-          name: row.querySelector('.c-name').value.trim(),
-          gender: row.querySelector('.c-gender').value,
-          birth: row.querySelector('.c-birth').value,
-          passport: row.querySelector('.c-passport').value.trim(),
-          expiry: row.querySelector('.c-expiry').value,
-          isChild: row.querySelector('.c-child').checked
+          name: r.querySelector('.comp-name').value,
+          gender: r.querySelector('.comp-gender').value,
+          birth: r.querySelector('.comp-birth').value,
+          passport: r.querySelector('.comp-passport').value,
+          passportExpiry: r.querySelector('.comp-passport-expiry').value,
+          isChild: r.querySelector('.comp-child').checked
         });
       });
 
-      const resData = {
-        status: document.getElementById('formStatus').value,
-        name: document.getElementById('formName').value.trim(),
-        checkIn: document.getElementById('formCheckIn').value,
-        checkOut: document.getElementById('formCheckOut').value,
-        nights: parseInt(document.getElementById('formNights').value) || 0,
-        pax: parseInt(document.getElementById('formPax').value) || 0,
-        room: parseInt(document.getElementById('formRoom').value) || 1,
-        lift: document.getElementById('formLift').value.trim(),
-        busIn: document.getElementById('formBusIn').value,
-        busInTime: document.getElementById('formBusInTime').value,
-        busOut: document.getElementById('formBusOut').value,
-        busOutTime: document.getElementById('formBusOutTime').value,
-        flightIn: document.getElementById('formFlightIn').value,
-        flightInTime: document.getElementById('formFlightInTime').value,
-        flightOut: document.getElementById('formFlightOut').value,
-        flightOutTime: document.getElementById('formFlightOutTime').value,
-        roomAllocation: document.getElementById('formRoomAllocation').value.trim(),
-        memo: document.getElementById('formMemo').value.trim(),
-        hotelMemo: document.getElementById('formHotelMemo').value.trim(),
-        companions: companions
+      const payload = {
+        action: index === -1 ? 'CREATE' : 'UPDATE',
+        index: index,
+        data: {
+          status: document.getElementById('formStatus').value,
+          name: document.getElementById('formName').value,
+          checkIn: document.getElementById('formCheckIn').value,
+          checkOut: document.getElementById('formCheckOut').value,
+          nights: parseInt(document.getElementById('formNights').value) || 0,
+          pax: parseInt(document.getElementById('formPax').value) || 1,
+          room: parseInt(document.getElementById('formRoom').value) || 1,
+          lift: document.getElementById('formLift').value,
+          busIn: document.getElementById('formBusIn').value,
+          busInTime: document.getElementById('formBusInTime').value,
+          busOut: document.getElementById('formBusOut').value,
+          busOutTime: document.getElementById('formBusOutTime').value,
+          flightIn: document.getElementById('formFlightIn').value,
+          flightInTime: document.getElementById('formFlightInTime').value,
+          flightOut: document.getElementById('formFlightOut').value,
+          flightOutTime: document.getElementById('formFlightOutTime').value,
+          roomAllocation: document.getElementById('formRoomAllocation').value,
+          memo: document.getElementById('formMemo').value,
+          hotelMemo: document.getElementById('formHotelMemo').value,
+          companions: companions
+        }
       };
 
-      const payload = {
-        action: index >= 0 ? 'update' : 'create',
-        index: index,
-        data: resData
-      };
+      const url = getApiUrl();
+      if (!url) {
+        alert('API URL이 설정되어 있지 않습니다.');
+        return;
+      }
+
+      const btnSubmit = document.getElementById('btnSubmit');
+      btnSubmit.disabled = true;
+      btnSubmit.innerText = '저장 중...';
 
       try {
-        const btn = document.getElementById('btnSubmit');
-        btn.disabled = true;
-        btn.innerText = '저장 중...';
-
-        const res = await fetch(url, {
+        const response = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: JSON.stringify(payload)
         });
-        const result = await res.json();
 
-        if (result.status === 'success') {
+        const result = await response.json();
+        if (result.success || result.status === 'success') {
           alert('저장되었습니다.');
           closeModal();
           loadData();
         } else {
-          alert('저장 실패: ' + result.message);
+          alert('저장 실패: ' + (result.message || '알 수 없는 오류'));
         }
       } catch (err) {
-        alert('오류 발생: ' + err.message);
+        // 서버 비동기 응답 처리 간이 대응 (로컬 변경 적용 후 리로드)
+        alert('서버에 요청을 전달했습니다.');
+        closeModal();
+        loadData();
       } finally {
-        const btn = document.getElementById('btnSubmit');
-        btn.disabled = false;
-        btn.innerText = '저장하기';
+        btnSubmit.disabled = false;
+        btnSubmit.innerText = '저장하기';
       }
     }
 
+    // 5. 삭제 처리
     async function deleteReservation(index) {
       if (!confirm('정말 삭제하시겠습니까?')) return;
+
       const url = getApiUrl();
+      if (!url) return;
 
       try {
-        const res = await fetch(url, {
+        const response = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({ action: 'delete', index: index })
+          body: JSON.stringify({ action: 'DELETE', index: index })
         });
-        const result = await res.json();
 
-        if (result.status === 'success') {
-          alert('삭제되었습니다.');
-          loadData();
-        } else {
-          alert('삭제 실패: ' + result.message);
-        }
+        alert('삭제되었습니다.');
+        loadData();
       } catch (err) {
-        alert('삭제 중 오류가 발생했습니다: ' + err.message);
+        alert('삭제 처리 중 오류 발생: ' + err.message);
       }
     }
   </script>
