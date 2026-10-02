@@ -115,7 +115,7 @@
       </div>
     </div>
 
-    <!-- 3. 예약 현황 테이블 (헤더 전체 틀고정 적용) -->
+    <!-- 3. 예약 현황 테이블 -->
     <div class="bg-white rounded-lg shadow overflow-hidden border border-gray-200">
       <div class="table-container">
         <table class="w-full text-xs text-left text-gray-600 border-collapse">
@@ -125,8 +125,8 @@
               <th class="p-2.5 sticky-col-2 w-[110px]">체크인/아웃</th>
               <th class="p-2.5 sticky-col-3 w-[100px]">예약자명</th>
               <th class="p-2.5 text-center min-w-[80px]">인원/객실</th>
-              <th class="p-2.5 min-w-[160px]">송영버스(IN/OUT)</th>
-              <th class="p-2.5 min-w-[140px]">항공편(IN/OUT)</th>
+              <th class="p-2.5 min-w-[170px]">송영버스(IN/OUT)</th>
+              <th class="p-2.5 min-w-[170px]">항공편(IN/OUT)</th>
               <th class="p-2.5 min-w-[90px]">방배정</th>
               <th class="p-2.5 min-w-[120px]">고객 메모</th>
               <th class="p-2.5 min-w-[120px]">호텔 메모</th>
@@ -213,8 +213,7 @@
             </div>
             <div>
               <label class="block text-xs font-bold text-gray-600 mb-1">인원수 (PAX)</label>
-              <!-- 인원수 변경 시 동행인 행 수 연동 -->
-              <input type="number" id="formPax" min="1" value="1" oninput="updateCompanionsByPax()" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+              <input type="number" id="formPax" min="0" value="1" oninput="updateCompanionsByPax()" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
             </div>
             <div>
               <label class="block text-xs font-bold text-gray-600 mb-1">객실수</label>
@@ -227,84 +226,119 @@
           </div>
         </div>
 
-        <!-- 교통 및 일정 정보 -->
+        <!-- 교통 및 일정 정보 (시각 필드 추가) -->
         <div>
           <h4 class="font-semibold text-gray-700 border-b pb-2 mb-3 text-sm flex items-center gap-2">
             <i class="fa-solid fa-plane text-blue-600"></i> 교통 및 일정 정보
           </h4>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label class="block text-xs font-bold text-gray-600 mb-1">송영 버스 (IN)</label>
-              <select id="formBusIn" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
-                <option value="">-- 선택 없음 --</option>
-                <option value="サホロEXP SAH03">サホロEXP SAH03</option>
-                <option value="サホロEXP SAH07">サホロEXP SAH07</option>
-                <option value="OBIHIRO">OBIHIRO</option>
-              </select>
+            
+            <!-- 송영버스 IN & 시각 -->
+            <div class="grid grid-cols-3 gap-2">
+              <div class="col-span-2">
+                <label class="block text-xs font-bold text-gray-600 mb-1">송영 버스 (IN)</label>
+                <select id="formBusIn" onchange="onBusInChange()" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+                  <option value="">-- 선택 없음 --</option>
+                  <option value="サホロEXP SAH03">サホロEXP SAH03</option>
+                  <option value="サホロEXP SAH07">サホロEXP SAH07</option>
+                  <option value="OBIHIRO">OBIHIRO</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-gray-600 mb-1">공항출발시각</label>
+                <input type="time" id="formBusInTime" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+              </div>
             </div>
-            <div>
-              <label class="block text-xs font-bold text-gray-600 mb-1">송영 버스 (OUT)</label>
-              <select id="formBusOut" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
-                <option value="">-- 선택 없음 --</option>
-                <option value="サホロEXP SAH06">サホロEXP SAH06</option>
-                <option value="サホロEXP SAH10">サホロEXP SAH10</option>
-                <option value="OBIHIRO">OBIHIRO</option>
-              </select>
+
+            <!-- 송영버스 OUT & 시각 -->
+            <div class="grid grid-cols-3 gap-2">
+              <div class="col-span-2">
+                <label class="block text-xs font-bold text-gray-600 mb-1">송영 버스 (OUT)</label>
+                <select id="formBusOut" onchange="onBusOutChange()" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+                  <option value="">-- 선택 없음 --</option>
+                  <option value="サホロEXP SAH06">サホロEXP SAH06</option>
+                  <option value="サホロEXP SAH10">サホロEXP SAH10</option>
+                  <option value="OBIHIRO">OBIHIRO</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-gray-600 mb-1">호텔출발시각</label>
+                <input type="time" id="formBusOutTime" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+              </div>
             </div>
-            <div>
-              <label class="block text-xs font-bold text-gray-600 mb-1">항공편 (IN)</label>
-              <select id="formFlightIn" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
-                <option value="">-- 선택 없음 --</option>
-                <option value="OZ174">OZ174</option>
-                <option value="KE765">KE765</option>
-                <option value="KE769">KE769</option>
-                <option value="TW263">TW263</option>
-                <option value="LJ203">LJ203</option>
-                <option value="LJ207">LJ207</option>
-                <option value="7C1501">7C1501</option>
-                <option value="7C1503">7C1503</option>
-                <option value="ZE625">ZE625</option>
-                <option value="ZE623">ZE623</option>
-                <option value="ZE621">ZE621</option>
-                <option value="ZE627">ZE627</option>
-                <option value="WE531">WE531</option>
-                <option value="YP751">YP751</option>
-                <option value="BX523">BX523</option>
-                <option value="TW269">TW269</option>
-                <option value="LJ527">LJ527</option>
-                <option value="ZE951">ZE951</option>
-                <option value="7C1551">7C1551</option>
-                <option value="RF352">RF352</option>
-                <option value="RF356">RF356</option>
-              </select>
+
+            <!-- 항공편 IN & 시각 -->
+            <div class="grid grid-cols-3 gap-2">
+              <div class="col-span-2">
+                <label class="block text-xs font-bold text-gray-600 mb-1">항공편 (IN)</label>
+                <select id="formFlightIn" onchange="onFlightInChange()" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+                  <option value="">-- 선택 없음 --</option>
+                  <option value="OZ174">OZ174</option>
+                  <option value="KE765">KE765</option>
+                  <option value="KE769">KE769</option>
+                  <option value="TW263">TW263</option>
+                  <option value="LJ203">LJ203</option>
+                  <option value="LJ207">LJ207</option>
+                  <option value="7C1501">7C1501</option>
+                  <option value="7C1503">7C1503</option>
+                  <option value="ZE625">ZE625</option>
+                  <option value="ZE623">ZE623</option>
+                  <option value="ZE621">ZE621</option>
+                  <option value="ZE627">ZE627</option>
+                  <option value="WE531">WE531</option>
+                  <option value="YP751">YP751</option>
+                  <option value="BX523">BX523</option>
+                  <option value="TW269">TW269</option>
+                  <option value="LJ527">LJ527</option>
+                  <option value="ZE951">ZE951</option>
+                  <option value="7C1551">7C1551</option>
+                  <option value="RF352">RF352</option>
+                  <option value="RF356">RF356</option>
+                  <option value="RF354">RF354</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-gray-600 mb-1">공항도착시각</label>
+                <input type="time" id="formFlightInTime" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+              </div>
             </div>
-            <div>
-              <label class="block text-xs font-bold text-gray-600 mb-1">항공편 (OUT)</label>
-              <select id="formFlightOut" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
-                <option value="">-- 선택 없음 --</option>
-                <option value="OZ173">OZ173</option>
-                <option value="KE766">KE766</option>
-                <option value="KE770">KE770</option>
-                <option value="TW264">TW264</option>
-                <option value="LJ204">LJ204</option>
-                <option value="LJ208">LJ208</option>
-                <option value="7C1502">7C1502</option>
-                <option value="7C1054">7C1054</option>
-                <option value="ZE626">ZE626</option>
-                <option value="ZE624">ZE624</option>
-                <option value="ZE622">ZE622</option>
-                <option value="ZE628">ZE628</option>
-                <option value="WE532">WE532</option>
-                <option value="YP752">YP752</option>
-                <option value="BX524">BX524</option>
-                <option value="TW270">TW270</option>
-                <option value="LJ528">LJ528</option>
-                <option value="ZE952">ZE952</option>
-                <option value="7C1552">7C1552</option>
-                <option value="RF351">RF351</option>
-                <option value="RF355">RF355</option>
-              </select>
+
+            <!-- 항공편 OUT & 시각 -->
+            <div class="grid grid-cols-3 gap-2">
+              <div class="col-span-2">
+                <label class="block text-xs font-bold text-gray-600 mb-1">항공편 (OUT)</label>
+                <select id="formFlightOut" onchange="onFlightOutChange()" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+                  <option value="">-- 선택 없음 --</option>
+                  <option value="OZ173">OZ173</option>
+                  <option value="KE766">KE766</option>
+                  <option value="KE770">KE770</option>
+                  <option value="TW264">TW264</option>
+                  <option value="LJ204">LJ204</option>
+                  <option value="LJ208">LJ208</option>
+                  <option value="7C1502">7C1502</option>
+                  <option value="7C1054">7C1054</option>
+                  <option value="ZE626">ZE626</option>
+                  <option value="ZE624">ZE624</option>
+                  <option value="ZE622">ZE622</option>
+                  <option value="ZE628">ZE628</option>
+                  <option value="WE532">WE532</option>
+                  <option value="YP752">YP752</option>
+                  <option value="BX524">BX524</option>
+                  <option value="TW270">TW270</option>
+                  <option value="LJ528">LJ528</option>
+                  <option value="ZE952">ZE952</option>
+                  <option value="7C1552">7C1552</option>
+                  <option value="RF351">RF351</option>
+                  <option value="RF355">RF355</option>
+                  <option value="RF353">RF353</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-gray-600 mb-1">공항출발시각</label>
+                <input type="time" id="formFlightOutTime" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+              </div>
             </div>
+
           </div>
         </div>
 
@@ -369,6 +403,56 @@
   <script>
     let reservations = [];
     let busMapGlobal = {};
+
+    // 엑셀 기준 시각 데이터 맵핑
+    const timeTables = {
+      busIn: {
+        "サホロEXP SAH03": "12:15",
+        "サホロEXP SAH07": "16:15",
+        "OBIHIRO": "17:00"
+      },
+      busOut: {
+        "サホロEXP SAH06": "08:20",
+        "サホロEXP SAH10": "12:30",
+        "OBIHIRO": "15:00"
+      },
+      flightIn: {
+        "OZ174": "10:45", "KE765": "12:50", "KE769": "15:40", "TW263": "13:10",
+        "LJ203": "11:15", "LJ207": "17:00", "7C1501": "10:00", "7C1503": "15:00",
+        "ZE625": "11:40", "ZE623": "17:05", "ZE621": "10:20", "ZE627": "12:55",
+        "WE531": "12:45", "YP751": "12:20", "BX523": "11:30", "TW269": "11:30",
+        "LJ527": "16:10", "ZE951": "17:00", "7C1551": "13:30", "RF352": "10:30",
+        "RF356": "16:00", "RF354": "16:15"
+      },
+      flightOut: {
+        "OZ173": "12:00", "KE766": "14:00", "KE770": "16:50", "TW264": "14:40",
+        "LJ204": "12:25", "LJ208": "18:00", "7C1502": "11:00", "7C1054": "16:00",
+        "ZE626": "13:00", "ZE624": "18:05", "ZE622": "11:20", "ZE628": "13:55",
+        "WE532": "14:05", "YP752": "13:45", "BX524": "12:30", "TW270": "12:30",
+        "LJ528": "17:10", "ZE952": "18:00", "7C1552": "14:30", "RF351": "11:30",
+        "RF355": "16:55", "RF353": "18:10"
+      }
+    };
+
+    function onBusInChange() {
+      const val = document.getElementById('formBusIn').value;
+      document.getElementById('formBusInTime').value = timeTables.busIn[val] || '';
+    }
+
+    function onBusOutChange() {
+      const val = document.getElementById('formBusOut').value;
+      document.getElementById('formBusOutTime').value = timeTables.busOut[val] || '';
+    }
+
+    function onFlightInChange() {
+      const val = document.getElementById('formFlightIn').value;
+      document.getElementById('formFlightInTime').value = timeTables.flightIn[val] || '';
+    }
+
+    function onFlightOutChange() {
+      const val = document.getElementById('formFlightOut').value;
+      document.getElementById('formFlightOutTime').value = timeTables.flightOut[val] || '';
+    }
 
     window.onload = function() {
       const savedUrl = localStorage.getItem('scriptApiUrl');
@@ -570,6 +654,11 @@
           statusText = '취소';
         }
 
+        const busInText = item.busIn ? `${item.busIn}${item.busInTime ? ' (' + item.busInTime + ')' : ''}` : '-';
+        const busOutText = item.busOut ? `${item.busOut}${item.busOutTime ? ' (' + item.busOutTime + ')' : ''}` : '-';
+        const flightInText = item.flightIn ? `${item.flightIn}${item.flightInTime ? ' (' + item.flightInTime + ')' : ''}` : '-';
+        const flightOutText = item.flightOut ? `${item.flightOut}${item.flightOutTime ? ' (' + item.flightOutTime + ')' : ''}` : '-';
+
         return `
           <tr class="hover:bg-gray-50 border-b">
             <td class="p-2 text-center sticky-col-1">
@@ -587,12 +676,12 @@
               <div class="text-[10px] text-gray-400">${item.room || 1}실</div>
             </td>
             <td class="p-2">
-              <div>IN: ${item.busIn || '-'}</div>
-              <div>OUT: ${item.busOut || '-'}</div>
+              <div>IN: ${busInText}</div>
+              <div>OUT: ${busOutText}</div>
             </td>
             <td class="p-2">
-              <div>IN: ${item.flightIn || '-'}</div>
-              <div>OUT: ${item.flightOut || '-'}</div>
+              <div>IN: ${flightInText}</div>
+              <div>OUT: ${flightOutText}</div>
             </td>
             <td class="p-2">${item.roomAllocation || '-'}</td>
             <td class="p-2">
@@ -637,10 +726,19 @@
         document.getElementById('formPax').value = item.pax || 1;
         document.getElementById('formRoom').value = item.room || 1;
         document.getElementById('formLift').value = item.lift || '';
+
         document.getElementById('formBusIn').value = item.busIn || '';
+        document.getElementById('formBusInTime').value = item.busInTime || (timeTables.busIn[item.busIn] || '');
+
         document.getElementById('formBusOut').value = item.busOut || '';
+        document.getElementById('formBusOutTime').value = item.busOutTime || (timeTables.busOut[item.busOut] || '');
+
         document.getElementById('formFlightIn').value = item.flightIn || '';
+        document.getElementById('formFlightInTime').value = item.flightInTime || (timeTables.flightIn[item.flightIn] || '');
+
         document.getElementById('formFlightOut').value = item.flightOut || '';
+        document.getElementById('formFlightOutTime').value = item.flightOutTime || (timeTables.flightOut[item.flightOut] || '');
+
         document.getElementById('formRoomAllocation').value = item.roomAllocation || '';
         document.getElementById('formMemo').value = item.memo || '';
         document.getElementById('formHotelMemo').value = item.hotelMemo || '';
@@ -669,16 +767,15 @@
 
     /* --- 동행인 제어 기능 --- */
 
-    // 인원수(PAX) 입력 값에 따라 동행인 행 수를 맞춤 (대표 예약자 제외 = PAX - 1)
     function updateCompanionsByPax() {
       const paxInput = document.getElementById('formPax');
-      let pax = parseInt(paxInput.value) || 1;
-      if (pax < 1) {
-        pax = 1;
-        paxInput.value = 1;
+      let pax = parseInt(paxInput.value);
+      if (isNaN(pax) || pax < 0) {
+        pax = 0;
+        paxInput.value = 0;
       }
 
-      const targetCompanionCount = Math.max(0, pax - 1);
+      const targetCompanionCount = pax;
       const tbody = document.getElementById('companionTableBody');
       let currentRows = tbody.querySelectorAll('.companion-row');
 
@@ -695,15 +792,13 @@
       }
     }
 
-    // [+ 동행인 추가] 버튼 클릭 시
     function handleAddCompanionClick() {
       const paxInput = document.getElementById('formPax');
-      let pax = parseInt(paxInput.value) || 1;
+      let pax = parseInt(paxInput.value) || 0;
       paxInput.value = pax + 1;
       addCompanionRow();
     }
 
-    // 동행인 행 추가 함수
     function addCompanionRow(data = {}) {
       const tbody = document.getElementById('companionTableBody');
       const tr = document.createElement('tr');
@@ -726,12 +821,11 @@
       tbody.appendChild(tr);
     }
 
-    // 동행인 행 삭제 함수 (삭제 시 인원수도 줄어듦)
     function removeCompanionRow(btn) {
       btn.closest('tr').remove();
       const paxInput = document.getElementById('formPax');
-      let pax = parseInt(paxInput.value) || 1;
-      if (pax > 1) {
+      let pax = parseInt(paxInput.value) || 0;
+      if (pax > 0) {
         paxInput.value = pax - 1;
       }
     }
@@ -765,13 +859,17 @@
         checkIn: document.getElementById('formCheckIn').value,
         checkOut: document.getElementById('formCheckOut').value,
         nights: parseInt(document.getElementById('formNights').value) || 0,
-        pax: parseInt(document.getElementById('formPax').value) || 1,
+        pax: parseInt(document.getElementById('formPax').value) || 0,
         room: parseInt(document.getElementById('formRoom').value) || 1,
         lift: document.getElementById('formLift').value.trim(),
         busIn: document.getElementById('formBusIn').value,
+        busInTime: document.getElementById('formBusInTime').value,
         busOut: document.getElementById('formBusOut').value,
+        busOutTime: document.getElementById('formBusOutTime').value,
         flightIn: document.getElementById('formFlightIn').value,
+        flightInTime: document.getElementById('formFlightInTime').value,
         flightOut: document.getElementById('formFlightOut').value,
+        flightOutTime: document.getElementById('formFlightOutTime').value,
         roomAllocation: document.getElementById('formRoomAllocation').value.trim(),
         memo: document.getElementById('formMemo').value.trim(),
         hotelMemo: document.getElementById('formHotelMemo').value.trim(),
