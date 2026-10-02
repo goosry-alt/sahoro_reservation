@@ -739,7 +739,6 @@
         document.getElementById('formMemo').value = '';
         document.getElementById('formHotelMemo').value = '';
         
-        // 인원수가 1일 때 동행자 행 생성 (인원수와 동일하게 생성되도록 수정)
         updateCompanionsByPax();
       } else {
         document.getElementById('modalTitle').innerText = '예약 정보 수정';
@@ -932,7 +931,7 @@
           alert('삭제되었습니다.');
           loadData();
         } else {
-          alert('삭제 실패: ' + (result.message || '알 수 없는 오류'));
+          alert('삭제 중 오류가 발생했습니다: ' + err.message);
         }
       } catch (err) {
         alert('삭제 중 오류가 발생했습니다: ' + err.message);
