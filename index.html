@@ -213,7 +213,8 @@
             </div>
             <div>
               <label class="block text-xs font-bold text-gray-600 mb-1">인원수 (PAX)</label>
-              <input type="number" id="formPax" min="1" value="1" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+              <!-- 인원수 변경 시 동행인 행 수 연동 -->
+              <input type="number" id="formPax" min="1" value="1" oninput="updateCompanionsByPax()" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
             </div>
             <div>
               <label class="block text-xs font-bold text-gray-600 mb-1">객실수</label>
@@ -334,7 +335,7 @@
             <h4 class="font-semibold text-gray-700 text-sm flex items-center gap-2">
               <i class="fa-solid fa-users text-blue-600"></i> 동행인 명단
             </h4>
-            <button type="button" onclick="addCompanionRow()" class="bg-slate-700 hover:bg-slate-800 text-white text-xs px-2.5 py-1 rounded">
+            <button type="button" onclick="handleAddCompanionClick()" class="bg-slate-700 hover:bg-slate-800 text-white text-xs px-2.5 py-1 rounded transition">
               + 동행인 추가
             </button>
           </div>
@@ -646,11 +647,15 @@
 
         if (item.companions && item.companions.length > 0) {
           item.companions.forEach(c => addCompanionRow(c));
+        } else {
+          updateCompanionsByPax();
         }
       } else {
         document.getElementById('resForm').reset();
         document.getElementById('formStatus').value = 'NEW';
+        document.getElementById('formPax').value = 1;
         document.getElementById('editIndex').value = -1;
+        updateCompanionsByPax();
       }
 
       document.getElementById('resModal').classList.remove('hidden');
@@ -662,6 +667,43 @@
       document.getElementById('resModal').classList.remove('flex');
     }
 
+    /* --- 동행인 제어 기능 --- */
+
+    // 인원수(PAX) 입력 값에 따라 동행인 행 수를 맞춤 (대표 예약자 제외 = PAX - 1)
+    function updateCompanionsByPax() {
+      const paxInput = document.getElementById('formPax');
+      let pax = parseInt(paxInput.value) || 1;
+      if (pax < 1) {
+        pax = 1;
+        paxInput.value = 1;
+      }
+
+      const targetCompanionCount = Math.max(0, pax - 1);
+      const tbody = document.getElementById('companionTableBody');
+      let currentRows = tbody.querySelectorAll('.companion-row');
+
+      if (currentRows.length < targetCompanionCount) {
+        const needed = targetCompanionCount - currentRows.length;
+        for (let i = 0; i < needed; i++) {
+          addCompanionRow();
+        }
+      } else if (currentRows.length > targetCompanionCount) {
+        const removeCount = currentRows.length - targetCompanionCount;
+        for (let i = 0; i < removeCount; i++) {
+          tbody.lastElementChild.remove();
+        }
+      }
+    }
+
+    // [+ 동행인 추가] 버튼 클릭 시
+    function handleAddCompanionClick() {
+      const paxInput = document.getElementById('formPax');
+      let pax = parseInt(paxInput.value) || 1;
+      paxInput.value = pax + 1;
+      addCompanionRow();
+    }
+
+    // 동행인 행 추가 함수
     function addCompanionRow(data = {}) {
       const tbody = document.getElementById('companionTableBody');
       const tr = document.createElement('tr');
@@ -679,9 +721,19 @@
         <td class="p-1"><input type="text" class="c-passport w-full text-xs p-1 border rounded" value="${data.passport || ''}"></td>
         <td class="p-1"><input type="date" class="c-expiry w-full text-xs p-1 border rounded" value="${data.expiry || ''}"></td>
         <td class="p-1 text-center"><input type="checkbox" class="c-child" ${data.isChild ? 'checked' : ''}></td>
-        <td class="p-1 text-center"><button type="button" onclick="this.closest('tr').remove()" class="text-rose-500 hover:text-rose-700 font-bold">×</button></td>
+        <td class="p-1 text-center"><button type="button" onclick="removeCompanionRow(this)" class="text-rose-500 hover:text-rose-700 font-bold">×</button></td>
       `;
       tbody.appendChild(tr);
+    }
+
+    // 동행인 행 삭제 함수 (삭제 시 인원수도 줄어듦)
+    function removeCompanionRow(btn) {
+      btn.closest('tr').remove();
+      const paxInput = document.getElementById('formPax');
+      let pax = parseInt(paxInput.value) || 1;
+      if (pax > 1) {
+        paxInput.value = pax - 1;
+      }
     }
 
     async function handleFormSubmit(e) {
