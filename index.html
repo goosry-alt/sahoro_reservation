@@ -15,7 +15,8 @@
       position: relative;
     }
     .table-container table {
-      border-separate: 0;
+      border-collapse: separate;
+      border-spacing: 0;
       width: 100%;
     }
     
@@ -37,6 +38,13 @@
     thead th.sticky-col-3 {
       z-index: 30 !important;
       background-color: #334155 !important;
+    }
+
+    /* 스티키 컬럼 배경색 유지 (hover 시) */
+    tr:hover .sticky-col-1,
+    tr:hover .sticky-col-2,
+    tr:hover .sticky-col-3 {
+      background-color: #f9fafb !important;
     }
   </style>
 </head>
@@ -114,7 +122,7 @@
     <!-- 3. 예약 현황 테이블 -->
     <div class="bg-white rounded-lg shadow overflow-hidden border border-gray-200">
       <div class="table-container">
-        <table class="w-full text-xs text-left text-gray-600 border-collapse">
+        <table class="w-full text-xs text-left text-gray-600">
           <thead class="bg-slate-700 text-white uppercase text-[11px] tracking-wider">
             <tr>
               <th class="p-2.5 text-center sticky-col-1 w-[70px]">상태</th>
@@ -365,7 +373,7 @@
             <h4 class="font-semibold text-gray-700 text-sm flex items-center gap-2">
               <i class="fa-solid fa-users text-blue-600"></i> 동행인 명단
             </h4>
-            <button type="button" onclick="handleAddCompanionClick()" class="bg-slate-700 hover:bg-slate-800 text-white text-xs px-2.5 py-1 rounded transition">
+            <button type="button" onclick="addCompanionRow()" class="bg-slate-700 hover:bg-slate-800 text-white text-xs px-2.5 py-1 rounded transition">
               + 동행인 추가
             </button>
           </div>
@@ -598,7 +606,6 @@
 
     function getSortedReservations() {
       const pinnedOrder = { 'NEW': 1, 'UPDATED': 2, 'WAITING': 3, 'CANCELLED': 4 };
-
       const indexedList = reservations.map((item, originalIndex) => ({ ...item, originalIndex }));
 
       return indexedList.sort((a, b) => {
@@ -690,8 +697,7 @@
             </td>
             <td class="p-2 text-center">
               <div class="flex justify-center gap-1">
-                <button onclick="openModal(${idx})" class="bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-1 rounded text-[11px] font-medium">수정</button>
-                <button onclick="deleteReservation(${idx})" class="bg-rose-100 hover:bg-rose-200 text-rose-700 px-2 py-1 rounded text-[11px] font-medium">삭제</button>
+                <button onclick="openModal(${idx})" class="bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-1 rounded text-[11px] font-medium transition">수정</button>
               </div>
             </td>
           </tr>
@@ -699,98 +705,22 @@
       }).join('');
     }
 
-    /* ----------------------------------------------------
-       보완 및 추가 구현된 자바스크립트 함수 영역
-    ---------------------------------------------------- */
-
-    // 1. 박수 계산
-    function calcNights() {
-      const inVal = document.getElementById('formCheckIn').value;
-      const outVal = document.getElementById('formCheckOut').value;
-      
-      if (inVal && outVal) {
-        const d1 = new Date(inVal);
-        const d2 = new Date(outVal);
-        const diffTime = d2 - d1;
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        document.getElementById('formNights').value = diffDays >= 0 ? diffDays : 0;
-      } else {
-        document.getElementById('formNights').value = 0;
-      }
-    }
-
-    // 2. 인원수 변경에 따른 동행인 입력란 자동 조절
-    function updateCompanionsByPax() {
-      const pax = parseInt(document.getElementById('formPax').value) || 1;
-      const tbody = document.getElementById('companionTableBody');
-      const currentRows = tbody.querySelectorAll('tr').length;
-
-      if (pax > currentRows) {
-        for (let i = currentRows; i < pax; i++) {
-          addCompanionRow();
-        }
-      } else if (pax < currentRows && currentRows > 0) {
-        for (let i = currentRows; i > pax; i--) {
-          if (tbody.lastChild) tbody.removeChild(tbody.lastChild);
-        }
-      }
-    }
-
-    // 동행인 행 추가 클릭 이벤트 핸들러
-    function handleAddCompanionClick() {
-      addCompanionRow();
-      const tbody = document.getElementById('companionTableBody');
-      document.getElementById('formPax').value = tbody.querySelectorAll('tr').length;
-    }
-
-    // 동행인 Row 생성 함수
-    function addCompanionRow(data = {}) {
-      const tbody = document.getElementById('companionTableBody');
-      const tr = document.createElement('tr');
-      tr.className = 'border-b hover:bg-gray-50';
-
-      tr.innerHTML = `
-        <td class="p-1.5"><input type="text" value="${data.name || ''}" placeholder="이름" class="comp-name w-full p-1 text-xs border rounded"></td>
-        <td class="p-1.5">
-          <select class="comp-gender w-full p-1 text-xs border rounded">
-            <option value="M" ${data.gender === 'M' ? 'selected' : ''}>남</option>
-            <option value="F" ${data.gender === 'F' ? 'selected' : ''}>여</option>
-          </select>
-        </td>
-        <td class="p-1.5"><input type="date" value="${data.birth || ''}" class="comp-birth w-full p-1 text-xs border rounded"></td>
-        <td class="p-1.5"><input type="text" value="${data.passport || ''}" placeholder="여권번호" class="comp-passport w-full p-1 text-xs border rounded uppercase"></td>
-        <td class="p-1.5"><input type="date" value="${data.passportExpiry || ''}" class="comp-passport-expiry w-full p-1 text-xs border rounded"></td>
-        <td class="p-1.5 text-center"><input type="checkbox" ${data.isChild ? 'checked' : ''} class="comp-child rounded"></td>
-        <td class="p-1.5 text-center">
-          <button type="button" onclick="removeCompanionRow(this)" class="text-rose-500 hover:text-rose-700 font-bold"><i class="fa-solid fa-trash"></i></button>
-        </td>
-      `;
-      tbody.appendChild(tr);
-    }
-
-    function removeCompanionRow(btn) {
-      const row = btn.closest('tr');
-      row.remove();
-      const tbody = document.getElementById('companionTableBody');
-      document.getElementById('formPax').value = tbody.querySelectorAll('tr').length || 1;
-    }
-
-    // 3. 모달 열기/닫기
-    function openModal(index = -1) {
+    // 모달 관리 및 폼 제어 함수
+    function openModal(index) {
       document.getElementById('editIndex').value = index;
-      const form = document.getElementById('resForm');
-      form.reset();
-      document.getElementById('companionTableBody').innerHTML = '';
+      const modal = document.getElementById('resModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
 
       if (index === -1) {
         document.getElementById('modalTitle').innerText = '신규 예약 등록';
+        document.getElementById('resForm').reset();
         document.getElementById('formStatus').value = 'NEW';
-        document.getElementById('formPax').value = 1;
-        document.getElementById('formRoom').value = 1;
-        updateCompanionsByPax();
+        document.getElementById('companionTableBody').innerHTML = '';
       } else {
         document.getElementById('modalTitle').innerText = '예약 정보 수정';
         const item = reservations[index];
+        if (!item) return;
 
         document.getElementById('formStatus').value = item.status || 'ACTIVE';
         document.getElementById('formName').value = item.name || '';
@@ -815,87 +745,122 @@
         document.getElementById('formMemo').value = item.memo || '';
         document.getElementById('formHotelMemo').value = item.hotelMemo || '';
 
-        if (Array.isArray(item.companions) && item.companions.length > 0) {
+        // 동행인 명단 채우기
+        const compBody = document.getElementById('companionTableBody');
+        compBody.innerHTML = '';
+        if (Array.isArray(item.companions)) {
           item.companions.forEach(c => addCompanionRow(c));
-        } else {
-          updateCompanionsByPax();
         }
       }
-
-      document.getElementById('resModal').classList.remove('hidden');
-      document.getElementById('resModal').classList.add('flex');
+      calcNights();
     }
 
     function closeModal() {
-      document.getElementById('resModal').classList.add('hidden');
-      document.getElementById('resModal').classList.remove('flex');
+      const modal = document.getElementById('resModal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
     }
 
-    // 4. Form Submit 및 서버 전송
-    async function handleFormSubmit(e) {
-      e.preventDefault();
+    function calcNights() {
+      const inDate = document.getElementById('formCheckIn').value;
+      const outDate = document.getElementById('formCheckOut').value;
+      if (inDate && outDate) {
+        const d1 = new Date(inDate);
+        const d2 = new Date(outDate);
+        const diffTime = d2 - d1;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        document.getElementById('formNights').value = diffDays > 0 ? diffDays : 0;
+      } else {
+        document.getElementById('formNights').value = 0;
+      }
+    }
 
-      const index = parseInt(document.getElementById('editIndex').value);
-      
-      // 동행인 데이터 모으기
-      const companions = [];
-      const rows = document.querySelectorAll('#companionTableBody tr');
-      rows.forEach(r => {
-        companions.push({
-          name: r.querySelector('.comp-name').value,
-          gender: r.querySelector('.comp-gender').value,
-          birth: r.querySelector('.comp-birth').value,
-          passport: r.querySelector('.comp-passport').value,
-          passportExpiry: r.querySelector('.comp-passport-expiry').value,
-          isChild: r.querySelector('.comp-child').checked
-        });
-      });
+    function updateCompanionsByPax() {
+      // 인원수 변경 시 동행인 행 수 조절 가능 (필요시 구현)
+    }
 
-      const payload = {
-        action: index === -1 ? 'CREATE' : 'UPDATE',
-        index: index,
-        data: {
-          status: document.getElementById('formStatus').value,
-          name: document.getElementById('formName').value,
-          checkIn: document.getElementById('formCheckIn').value,
-          checkOut: document.getElementById('formCheckOut').value,
-          nights: parseInt(document.getElementById('formNights').value) || 0,
-          pax: parseInt(document.getElementById('formPax').value) || 1,
-          room: parseInt(document.getElementById('formRoom').value) || 1,
-          lift: document.getElementById('formLift').value,
-          busIn: document.getElementById('formBusIn').value,
-          busInTime: document.getElementById('formBusInTime').value,
-          busOut: document.getElementById('formBusOut').value,
-          busOutTime: document.getElementById('formBusOutTime').value,
-          flightIn: document.getElementById('formFlightIn').value,
-          flightInTime: document.getElementById('formFlightInTime').value,
-          flightOut: document.getElementById('formFlightOut').value,
-          flightOutTime: document.getElementById('formFlightOutTime').value,
-          roomAllocation: document.getElementById('formRoomAllocation').value,
-          memo: document.getElementById('formMemo').value,
-          hotelMemo: document.getElementById('formHotelMemo').value,
-          companions: companions
-        }
-      };
+    function addCompanionRow(data = {}) {
+      const tbody = document.getElementById('companionTableBody');
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td class="p-1.5"><input type="text" name="compName" value="${data.name || ''}" class="w-full text-xs p-1 border rounded"></td>
+        <td class="p-1.5">
+          <select name="compGender" class="w-full text-xs p-1 border rounded">
+            <option value="M" ${data.gender === 'M' ? 'selected' : ''}>남</option>
+            <option value="F" ${data.gender === 'F' ? 'selected' : ''}>여</option>
+          </select>
+        </td>
+        <td class="p-1.5"><input type="date" name="compBirth" value="${data.birth || ''}" class="w-full text-xs p-1 border rounded"></td>
+        <td class="p-1.5"><input type="text" name="compPassport" value="${data.passport || ''}" class="w-full text-xs p-1 border rounded"></td>
+        <td class="p-1.5"><input type="date" name="compExpire" value="${data.expire || ''}" class="w-full text-xs p-1 border rounded"></td>
+        <td class="p-1.5 text-center">
+          <input type="checkbox" name="compChild" ${data.child ? 'checked' : ''} class="rounded border-gray-300">
+        </td>
+        <td class="p-1.5 text-center">
+          <button type="button" onclick="this.closest('tr').remove()" class="text-rose-500 hover:text-rose-700 font-bold"><i class="fa-solid fa-trash"></i></button>
+        </td>
+      `;
+      tbody.appendChild(row);
+    }
 
+    async function handleFormSubmit(event) {
+      event.preventDefault();
       const url = getApiUrl();
       if (!url) {
-        alert('API URL이 설정되어 있지 않습니다.');
+        alert('API URL이 설정되지 않았습니다.');
         return;
       }
 
-      const btnSubmit = document.getElementById('btnSubmit');
-      btnSubmit.disabled = true;
-      btnSubmit.innerText = '저장 중...';
+      const index = parseInt(document.getElementById('editIndex').value);
+
+      // 동행인 수집
+      const companions = [];
+      document.querySelectorAll('#companionTableBody tr').forEach(tr => {
+        companions.push({
+          name: tr.querySelector('[name="compName"]').value,
+          gender: tr.querySelector('[name="compGender"]').value,
+          birth: tr.querySelector('[name="compBirth"]').value,
+          passport: tr.querySelector('[name="compPassport"]').value,
+          expire: tr.querySelector('[name="compExpire"]').value,
+          child: tr.querySelector('[name="compChild"]').checked
+        });
+      });
+
+      const formData = {
+        index: index, // -1이면 신규, 아니면 수정
+        status: document.getElementById('formStatus').value,
+        name: document.getElementById('formName').value,
+        checkIn: document.getElementById('formCheckIn').value,
+        checkOut: document.getElementById('formCheckOut').value,
+        nights: document.getElementById('formNights').value,
+        pax: document.getElementById('formPax').value,
+        room: document.getElementById('formRoom').value,
+        lift: document.getElementById('formLift').value,
+        busIn: document.getElementById('formBusIn').value,
+        busInTime: document.getElementById('formBusInTime').value,
+        busOut: document.getElementById('formBusOut').value,
+        busOutTime: document.getElementById('formBusOutTime').value,
+        flightIn: document.getElementById('formFlightIn').value,
+        flightInTime: document.getElementById('formFlightInTime').value,
+        flightOut: document.getElementById('formFlightOut').value,
+        flightOutTime: document.getElementById('formFlightOutTime').value,
+        roomAllocation: document.getElementById('formRoomAllocation').value,
+        memo: document.getElementById('formMemo').value,
+        hotelMemo: document.getElementById('formHotelMemo').value,
+        companions: companions
+      };
 
       try {
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify(payload)
-        });
+        const btn = document.getElementById('btnSubmit');
+        btn.disabled = true;
+        btn.innerText = '저장 중...';
 
-        const result = await response.json();
+        const res = await fetch(url, {
+          method: 'POST',
+          body: JSON.stringify(formData)
+        });
+        const result = await res.json();
+
         if (result.success || result.status === 'success') {
           alert('저장되었습니다.');
           closeModal();
@@ -904,34 +869,11 @@
           alert('저장 실패: ' + (result.message || '알 수 없는 오류'));
         }
       } catch (err) {
-        // 서버 비동기 응답 처리 간이 대응 (로컬 변경 적용 후 리로드)
-        alert('서버에 요청을 전달했습니다.');
-        closeModal();
-        loadData();
+        alert('저장 중 통신 오류가 발생했습니다: ' + err.message);
       } finally {
-        btnSubmit.disabled = false;
-        btnSubmit.innerText = '저장하기';
-      }
-    }
-
-    // 5. 삭제 처리
-    async function deleteReservation(index) {
-      if (!confirm('정말 삭제하시겠습니까?')) return;
-
-      const url = getApiUrl();
-      if (!url) return;
-
-      try {
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({ action: 'DELETE', index: index })
-        });
-
-        alert('삭제되었습니다.');
-        loadData();
-      } catch (err) {
-        alert('삭제 처리 중 오류 발생: ' + err.message);
+        const btn = document.getElementById('btnSubmit');
+        btn.disabled = false;
+        btn.innerText = '저장하기';
       }
     }
   </script>
