@@ -13,14 +13,21 @@
     .table-container {
       max-height: 600px;
       overflow: auto;
+      position: relative;
     }
     .table-container table {
       border-separate: 0;
+      width: 100%;
     }
+    
+    /* 헤더 전체 상단 틀고정 (Sticky Top) */
     .table-container thead th {
       position: sticky;
       top: 0;
       z-index: 20;
+      background-color: #334155 !important; /* bg-slate-700 */
+      color: #ffffff;
+      box-shadow: inset 0 -1px 0 #475569;
     }
     
     /* 좌측 열 고정 (Sticky Left Columns) */
@@ -28,12 +35,12 @@
     .sticky-col-2 { position: sticky; left: 70px; z-index: 10; background-color: #ffffff; }
     .sticky-col-3 { position: sticky; left: 180px; z-index: 10; background-color: #ffffff; }
     
-    /* 헤더 sticky 순서 맞춤 */
+    /* 헤더 + 좌측 고정 열 교차점 (최상위 Layer) */
     thead th.sticky-col-1,
     thead th.sticky-col-2,
     thead th.sticky-col-3 {
       z-index: 30 !important;
-      background-color: #334155 !important; /* bg-slate-700 */
+      background-color: #334155 !important;
     }
   </style>
 </head>
@@ -108,22 +115,22 @@
       </div>
     </div>
 
-    <!-- 3. 예약 현황 테이블 -->
+    <!-- 3. 예약 현황 테이블 (헤더 전체 틀고정 적용) -->
     <div class="bg-white rounded-lg shadow overflow-hidden border border-gray-200">
       <div class="table-container">
         <table class="w-full text-xs text-left text-gray-600 border-collapse">
           <thead class="bg-slate-700 text-white uppercase text-[11px] tracking-wider">
             <tr>
-              <th class="p-2.5 text-center border-b border-slate-600 sticky-col-1 w-[70px]">상태</th>
-              <th class="p-2.5 border-b border-slate-600 sticky-col-2 w-[110px]">체크인/아웃</th>
-              <th class="p-2.5 border-b border-slate-600 sticky-col-3 w-[100px]">예약자명</th>
-              <th class="p-2.5 text-center border-b border-slate-600 min-w-[80px]">인원/객실</th>
-              <th class="p-2.5 border-b border-slate-600 min-w-[160px]">송영버스(IN/OUT)</th>
-              <th class="p-2.5 border-b border-slate-600 min-w-[140px]">항공편(IN/OUT)</th>
-              <th class="p-2.5 border-b border-slate-600 min-w-[90px]">방배정</th>
-              <th class="p-2.5 border-b border-slate-600 min-w-[120px]">고객 메모</th>
-              <th class="p-2.5 border-b border-slate-600 min-w-[120px]">호텔 메모</th>
-              <th class="p-2.5 text-center border-b border-slate-600 min-w-[90px]">관리</th>
+              <th class="p-2.5 text-center sticky-col-1 w-[70px]">상태</th>
+              <th class="p-2.5 sticky-col-2 w-[110px]">체크인/아웃</th>
+              <th class="p-2.5 sticky-col-3 w-[100px]">예약자명</th>
+              <th class="p-2.5 text-center min-w-[80px]">인원/객실</th>
+              <th class="p-2.5 min-w-[160px]">송영버스(IN/OUT)</th>
+              <th class="p-2.5 min-w-[140px]">항공편(IN/OUT)</th>
+              <th class="p-2.5 min-w-[90px]">방배정</th>
+              <th class="p-2.5 min-w-[120px]">고객 메모</th>
+              <th class="p-2.5 min-w-[120px]">호텔 메모</th>
+              <th class="p-2.5 text-center min-w-[90px]">관리</th>
             </tr>
           </thead>
           <tbody id="reservationTableBody" class="divide-y divide-gray-200">
