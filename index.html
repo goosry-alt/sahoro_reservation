@@ -25,7 +25,7 @@
       position: sticky;
       top: 0;
       z-index: 20;
-      background-color: #334155 !important; /* bg-slate-700 */
+      background-color: #334155 !important;
       color: #ffffff;
       box-shadow: inset 0 -1px 0 #475569;
     }
@@ -35,7 +35,7 @@
     .sticky-col-2 { position: sticky; left: 70px; z-index: 10; background-color: #ffffff; }
     .sticky-col-3 { position: sticky; left: 180px; z-index: 10; background-color: #ffffff; }
     
-    /* 헤더 + 좌측 고정 열 교차점 (최상위 Layer) */
+    /* 헤더 + 좌측 고정 열 교차점 */
     thead th.sticky-col-1,
     thead th.sticky-col-2,
     thead th.sticky-col-3 {
@@ -125,8 +125,8 @@
               <th class="p-2.5 sticky-col-2 w-[110px]">체크인/아웃</th>
               <th class="p-2.5 sticky-col-3 w-[100px]">예약자명</th>
               <th class="p-2.5 text-center min-w-[80px]">인원/객실</th>
-              <th class="p-2.5 min-w-[170px]">송영버스(IN/OUT)</th>
-              <th class="p-2.5 min-w-[170px]">항공편(IN/OUT)</th>
+              <th class="p-2.5 min-w-[180px]">송영버스(IN/OUT)</th>
+              <th class="p-2.5 min-w-[180px]">항공편(IN/OUT)</th>
               <th class="p-2.5 min-w-[90px]">방배정</th>
               <th class="p-2.5 min-w-[120px]">고객 메모</th>
               <th class="p-2.5 min-w-[120px]">호텔 메모</th>
@@ -404,7 +404,6 @@
     let reservations = [];
     let busMapGlobal = {};
 
-    // 엑셀 기준 시각 데이터 맵핑
     const timeTables = {
       busIn: {
         "サホロEXP SAH03": "12:15",
@@ -654,10 +653,11 @@
           statusText = '취소';
         }
 
-        const busInText = item.busIn ? `${item.busIn}${item.busInTime ? ' (' + item.busInTime + ')' : ''}` : '-';
-        const busOutText = item.busOut ? `${item.busOut}${item.busOutTime ? ' (' + item.busOutTime + ')' : ''}` : '-';
-        const flightInText = item.flightIn ? `${item.flightIn}${item.flightInTime ? ' (' + item.flightInTime + ')' : ''}` : '-';
-        const flightOutText = item.flightOut ? `${item.flightOut}${item.flightOutTime ? ' (' + item.flightOutTime + ')' : ''}` : '-';
+        const busInStr = item.busIn ? `${item.busIn}${item.busInTime ? ' (' + item.busInTime + ')' : ''}` : '-';
+        const busOutStr = item.busOut ? `${item.busOut}${item.busOutTime ? ' (' + item.busOutTime + ')' : ''}` : '-';
+        
+        const flightInStr = item.flightIn ? `${item.flightIn}${item.flightInTime ? ' (' + item.flightInTime + ')' : ''}` : '-';
+        const flightOutStr = item.flightOut ? `${item.flightOut}${item.flightOutTime ? ' (' + item.flightOutTime + ')' : ''}` : '-';
 
         return `
           <tr class="hover:bg-gray-50 border-b">
@@ -676,12 +676,12 @@
               <div class="text-[10px] text-gray-400">${item.room || 1}실</div>
             </td>
             <td class="p-2">
-              <div>IN: ${busInText}</div>
-              <div>OUT: ${busOutText}</div>
+              <div><span class="text-gray-400">IN:</span> ${busInStr}</div>
+              <div><span class="text-gray-400">OUT:</span> ${busOutStr}</div>
             </td>
             <td class="p-2">
-              <div>IN: ${flightInText}</div>
-              <div>OUT: ${flightOutText}</div>
+              <div><span class="text-gray-400">IN:</span> ${flightInStr}</div>
+              <div><span class="text-gray-400">OUT:</span> ${flightOutStr}</div>
             </td>
             <td class="p-2">${item.roomAllocation || '-'}</td>
             <td class="p-2">
@@ -764,8 +764,6 @@
       document.getElementById('resModal').classList.add('hidden');
       document.getElementById('resModal').classList.remove('flex');
     }
-
-    /* --- 동행인 제어 기능 --- */
 
     function updateCompanionsByPax() {
       const paxInput = document.getElementById('formPax');
