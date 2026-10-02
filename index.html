@@ -363,7 +363,7 @@
         <div>
           <div class="flex justify-between items-center border-b pb-2 mb-3">
             <h4 class="font-semibold text-gray-700 text-sm flex items-center gap-2">
-              <i class="fa-solid fa-users text-blue-600"></i> 동행인 명단
+              <i class="fa-solid fa-users text-blue-600"></i> 동행인 명단 (인원수 연동)
             </h4>
             <button type="button" onclick="handleAddCompanionClick()" class="bg-slate-700 hover:bg-slate-800 text-white text-xs px-2.5 py-1 rounded transition">
               + 동행인 추가
@@ -739,14 +739,18 @@
         document.getElementById('formMemo').value = '';
         document.getElementById('formHotelMemo').value = '';
         
-        addCompanionRow();
+        // 인원수가 1일 때 동행자 행 생성 (인원수와 동일하게 생성되도록 수정)
+        updateCompanionsByPax();
       } else {
         document.getElementById('modalTitle').innerText = '예약 정보 수정';
         const item = reservations[idx];
         document.getElementById('formStatus').value = item.status || 'ACTIVE';
         document.getElementById('formName').value = item.name || '';
-        document.getElementById('formCheckIn').value = item.checkIn || '';
-        document.getElementById('formCheckOut').value = item.checkOut || '';
+        
+        // 날짜 리셋 버그 수정: YYYY-MM-DD(요일) 형태에서 앞 10자리 추출
+        document.getElementById('formCheckIn').value = item.checkIn ? item.checkIn.substring(0, 10) : '';
+        document.getElementById('formCheckOut').value = item.checkOut ? item.checkOut.substring(0, 10) : '';
+        
         document.getElementById('formNights').value = item.nights || 0;
         document.getElementById('formPax').value = item.pax || 1;
         document.getElementById('formRoom').value = item.room || 1;
@@ -766,7 +770,7 @@
         if (item.companions && Array.isArray(item.companions) && item.companions.length > 0) {
           item.companions.forEach(c => addCompanionRow(c));
         } else {
-          addCompanionRow();
+          updateCompanionsByPax();
         }
       }
 
@@ -779,16 +783,22 @@
       document.getElementById('resModal').classList.remove('flex');
     }
 
+    // 동행자 행 추가 함수 (성별 기본값 공란 처리)
     function addCompanionRow(data = {}) {
       const tbody = document.getElementById('companionTableBody');
       const tr = document.createElement('tr');
       tr.className = 'border-b hover:bg-gray-50';
+      
+      const genderM = data.gender === 'M' ? 'selected' : '';
+      const genderF = data.gender === 'F' ? 'selected' : '';
+
       tr.innerHTML = `
         <td class="p-1"><input type="text" class="comp-name w-full p-1 border rounded text-xs" value="${data.name || ''}" placeholder="이름"></td>
         <td class="p-1">
           <select class="comp-gender w-full p-1 border rounded text-xs">
-            <option value="M" ${data.gender === 'M' ? 'selected' : ''}>남 (M)</option>
-            <option value="F" ${data.gender === 'F' ? 'selected' : ''}>여 (F)</option>
+            <option value="">선택</option>
+            <option value="M" ${genderM}>남 (M)</option>
+            <option value="F" ${genderF}>여 (F)</option>
           </select>
         </td>
         <td class="p-1"><input type="date" class="comp-birth w-full p-1 border rounded text-xs" value="${data.birth || ''}"></td>
@@ -804,8 +814,23 @@
       addCompanionRow();
     }
 
+    // 인원수(PAX)와 동일한 수만큼 동행자 행 생성
     function updateCompanionsByPax() {
-      // 필요 시 인원수에 맞춰 동행인 행 조정 로직 추가 가능
+      const pax = parseInt(document.getElementById('formPax').value) || 1;
+      const tbody = document.getElementById('companionTableBody');
+      const currentRows = tbody.querySelectorAll('tr');
+
+      if (currentRows.length < pax) {
+        const diff = pax - currentRows.length;
+        for (let i = 0; i < diff; i++) {
+          addCompanionRow();
+        }
+      } else if (currentRows.length > pax) {
+        const diff = currentRows.length - pax;
+        for (let i = 0; i < diff; i++) {
+          tbody.removeChild(tbody.lastChild);
+        }
+      }
     }
 
     async function handleFormSubmit(event) {
