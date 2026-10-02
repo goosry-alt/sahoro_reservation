@@ -431,6 +431,16 @@
       }
     };
 
+    function formatTime(t) {
+      if (!t) return '';
+      // 만약 '12:15:00' 형태로 오면 앞 5글자(12:15)만 추출
+      const str = String(t).trim();
+      if (str.length >= 5) {
+        return str.substring(0, 5);
+      }
+      return str;
+    }
+
     function onBusInChange() {
       const val = document.getElementById('formBusIn').value;
       document.getElementById('formBusInTime').value = timeTables.busIn[val] || '';
@@ -651,11 +661,16 @@
           statusText = '취소';
         }
 
-        const busInStr = item.busIn ? `${item.busIn}${item.busInTime ? ' (' + item.busInTime + ')' : ''}` : '-';
-        const busOutStr = item.busOut ? `${item.busOut}${item.busOutTime ? ' (' + item.busOutTime + ')' : ''}` : '-';
+        const bInTime = formatTime(item.busInTime);
+        const bOutTime = formatTime(item.busOutTime);
+        const fInTime = formatTime(item.flightInTime);
+        const fOutTime = formatTime(item.flightOutTime);
+
+        const busInStr = item.busIn ? `${item.busIn}${bInTime ? ' (' + bInTime + ')' : ''}` : '-';
+        const busOutStr = item.busOut ? `${item.busOut}${bOutTime ? ' (' + bOutTime + ')' : ''}` : '-';
         
-        const flightInStr = item.flightIn ? `${item.flightIn}${item.flightInTime ? ' (' + item.flightInTime + ')' : ''}` : '-';
-        const flightOutStr = item.flightOut ? `${item.flightOut}${item.flightOutTime ? ' (' + item.flightOutTime + ')' : ''}` : '-';
+        const flightInStr = item.flightIn ? `${item.flightIn}${fInTime ? ' (' + fInTime + ')' : ''}` : '-';
+        const flightOutStr = item.flightOut ? `${item.flightOut}${fOutTime ? ' (' + fOutTime + ')' : ''}` : '-';
 
         return `
           <tr class="hover:bg-gray-50 border-b">
@@ -746,7 +761,6 @@
         document.getElementById('formStatus').value = item.status || 'ACTIVE';
         document.getElementById('formName').value = item.name || '';
         
-        // 날짜 리셋 버그 수정: YYYY-MM-DD(요일) 형태에서 앞 10자리 추출
         document.getElementById('formCheckIn').value = item.checkIn ? item.checkIn.substring(0, 10) : '';
         document.getElementById('formCheckOut').value = item.checkOut ? item.checkOut.substring(0, 10) : '';
         
@@ -755,13 +769,13 @@
         document.getElementById('formRoom').value = item.room || 1;
         document.getElementById('formLift').value = item.lift || '';
         document.getElementById('formBusIn').value = item.busIn || '';
-        document.getElementById('formBusInTime').value = item.busInTime || '';
+        document.getElementById('formBusInTime').value = formatTime(item.busInTime);
         document.getElementById('formBusOut').value = item.busOut || '';
-        document.getElementById('formBusOutTime').value = item.busOutTime || '';
+        document.getElementById('formBusOutTime').value = formatTime(item.busOutTime);
         document.getElementById('formFlightIn').value = item.flightIn || '';
-        document.getElementById('formFlightInTime').value = item.flightInTime || '';
+        document.getElementById('formFlightInTime').value = formatTime(item.flightInTime);
         document.getElementById('formFlightOut').value = item.flightOut || '';
-        document.getElementById('formFlightOutTime').value = item.flightOutTime || '';
+        document.getElementById('formFlightOutTime').value = formatTime(item.flightOutTime);
         document.getElementById('formRoomAllocation').value = item.roomAllocation || '';
         document.getElementById('formMemo').value = item.memo || '';
         document.getElementById('formHotelMemo').value = item.hotelMemo || '';
@@ -931,7 +945,7 @@
           alert('삭제되었습니다.');
           loadData();
         } else {
-          alert('삭제 중 오류가 발생했습니다: ' + err.message);
+          alert('삭제 실패: ' + (result.message || '알 수 없는 오류'));
         }
       } catch (err) {
         alert('삭제 중 오류가 발생했습니다: ' + err.message);
