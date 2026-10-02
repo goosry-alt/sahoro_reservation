@@ -431,10 +431,20 @@
       }
     };
 
+    // 어떤 형식(Date 객체, Sat Dec 형태의 긴 문자열 등)이 들어와도 무조건 HH:MM 형태로 변환하는 함수
     function formatTime(t) {
       if (!t) return '';
-      // 만약 '12:15:00' 형태로 오면 앞 5글자(12:15)만 추출
       const str = String(t).trim();
+      
+      // 만약 "Sat Dec 30 1899 16:15:00 ..." 형태라면 시간 추출
+      if (str.includes("GMT") || str.includes("1899") || str.includes("Sat") || str.includes("Sun") || str.includes("Mon") || str.includes("Tue") || str.includes("Wed") || str.includes("Thu") || str.includes("Fri")) {
+        const match = str.match(/(\d{2}):(\d{2})/);
+        if (match) {
+          return match[1] + ':' + match[2];
+        }
+      }
+      
+      // 일반적인 "HH:MM" 또는 "HH:MM:SS" 형태인 경우 앞 5글자만 추출
       if (str.length >= 5) {
         return str.substring(0, 5);
       }
