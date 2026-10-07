@@ -197,7 +197,7 @@
             </div>
             <div>
               <label class="block text-xs font-bold text-gray-600 mb-1">체크인 (출발일) *</label>
-              <input type="date" id="formCheckIn" required onchange="calcNights(); checkAllCompanionsAge();" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+              <input type="date" id="formCheckIn" required onchange="calcNights()" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
             </div>
             <div>
               <label class="block text-xs font-bold text-gray-600 mb-1">체크아웃 *</label>
@@ -213,7 +213,7 @@
             </div>
             <div>
               <label class="block text-xs font-bold text-gray-600 mb-1">객실수</label>
-              <input type="number" id="formRoom" min="1" value="1" oninput="updateRoomSelectOptions()" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+              <input type="number" id="formRoom" min="1" value="1" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
             </div>
             <div>
               <label class="block text-xs font-bold text-gray-600 mb-1">리프트권</label>
@@ -233,4 +233,13 @@
             <div class="grid grid-cols-3 gap-2">
               <div class="col-span-2">
                 <label class="block text-xs font-bold text-gray-600 mb-1">송영 버스 (IN)</label>
-                <select id="formBusIn" onchange="onBus
+                <select id="formBusIn" onchange="onBusInChange()" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+                  <option value="">-- 선택 없음 --</option>
+                  <option value="サホロEXP SAH03">サホロEXP SAH03</option>
+                  <option value="サホロEXP SAH07">サホロEXP SAH07</option>
+                  <option value="OBIHIRO">OBIHIRO</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-gray-600 mb-1">공항출발시각</label>
+                <input type="time" id="formBusInTime" class="
