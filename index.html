@@ -193,4 +193,23 @@
             </div>
             <div>
               <label class="block text-xs font-bold text-gray-600 mb-1">예약자명 *</label>
-              <input type="text" id="formName" required class="w-full text-xs p-
+              <input type="text" id="formName" required class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-gray-600 mb-1">체크인 (출발일) *</label>
+              <input type="date" id="formCheckIn" required onchange="calcNights(); checkAllCompanionsAge();" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-gray-600 mb-1">체크아웃 *</label>
+              <input type="date" id="formCheckOut" required onchange="calcNights()" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-gray-600 mb-1">박수</label>
+              <input type="number" id="formNights" min="0" value="0" readonly class="w-full text-xs p-2 border bg-gray-100 rounded">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-gray-600 mb-1">인원수 (PAX)</label>
+              <input type="number" id="formPax" min="1" value="1" oninput="updateCompanionsByPax()" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text
