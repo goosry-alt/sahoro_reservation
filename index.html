@@ -354,4 +354,200 @@
             </div>
             <div>
               <label class="block text-xs font-bold text-gray-600 mb-1">호텔 메모</label>
-              <input
+              <input type="text" id="formHotelMemo" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+            </div>
+          </div>
+        </div>
+
+        <!-- 동행인 명단 -->
+        <div>
+          <div class="flex justify-between items-center border-b pb-2 mb-3">
+            <h4 class="font-semibold text-gray-700 text-sm flex items-center gap-2">
+              <i class="fa-solid fa-users text-blue-600"></i> 동행인 명단 (인원수 연동)
+            </h4>
+            <button type="button" onclick="handleAddCompanionClick()" class="bg-slate-700 hover:bg-slate-800 text-white text-xs px-2.5 py-1 rounded transition">
+              + 동행인 추가
+            </button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-xs text-left">
+              <thead>
+                <tr class="bg-gray-100 border-b">
+                  <th class="p-2">이름</th>
+                  <th class="p-2 w-20">성별</th>
+                  <th class="p-2">생년월일</th>
+                  <th class="p-2">여권번호</th>
+                  <th class="p-2">여권유효기간</th>
+                  <th class="p-2 text-center w-20">소아 여부</th>
+                  <th class="p-2 w-28">객실 배정</th>
+                  <th class="p-2 text-center w-12">삭제</th>
+                </tr>
+              </thead>
+              <tbody id="companionTableBody" class="divide-y divide-gray-200">
+                <!-- 동적 생성 -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="flex justify-end gap-2 pt-4 border-t">
+          <button type="button" onclick="closeModal()" class="px-4 py-2 text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 rounded font-medium">취소</button>
+          <button type="submit" id="btnSubmit" class="px-5 py-2 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded font-medium">저장하기</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    let reservations = [];
+    let busMapGlobal = {};
+
+    const timeTables = {
+      busIn: {
+        "サホロEXP SAH03": "12:15",
+        "サホロEXP SAH07": "16:15",
+        "OBIHIRO": "17:00"
+      },
+      busOut: {
+        "サホロEXP SAH06": "08:20",
+        "サホロEXP SAH10": "12:30",
+        "OBIHIRO": "15:00"
+      },
+      flightIn: {
+        "OZ174": "10:45", "KE765": "12:50", "KE769": "15:40", "TW263": "13:10",
+        "LJ203": "11:15", "LJ207": "17:00", "7C1501": "10:00", "7C1503": "15:00",
+        "ZE625": "11:40", "ZE623": "17:05", "ZE621": "10:20", "ZE627": "12:55",
+        "WE531": "12:45", "YP751": "12:20", "BX523": "11:30", "TW269": "11:30",
+        "LJ527": "16:10", "ZE951": "17:00", "7C1551": "13:30", "RF352": "10:30",
+        "RF356": "16:00", "RF354": "16:15"
+      },
+      flightOut: {
+        "OZ173": "12:00", "KE766": "14:00", "KE770": "16:50", "TW264": "14:40",
+        "LJ204": "12:25", "LJ208": "18:00", "7C1502": "11:00", "7C1054": "16:00",
+        "ZE626": "13:00", "ZE624": "18:05", "ZE622": "11:20", "ZE628": "13:55",
+        "WE532": "14:05", "YP752": "13:45", "BX524": "12:30", "TW270": "12:30",
+        "LJ528": "17:10", "ZE952": "18:00", "7C1552": "14:30", "RF351": "11:30",
+        "RF355": "16:55", "RF353": "18:10"
+      }
+    };
+
+    function formatTime(t) {
+      if (!t) return '';
+      const str = String(t).trim();
+      if (str.includes("GMT") || str.includes("1899") || str.includes("Sat") || str.includes("Sun") || str.includes("Mon") || str.includes("Tue") || str.includes("Wed") || str.includes("Thu") || str.includes("Fri")) {
+        const match = str.match(/(\d{2}):(\d{2})/);
+        if (match) return match[1] + ':' + match[2];
+      }
+      if (str.length >= 5) return str.substring(0, 5);
+      return str;
+    }
+
+    function onBusInChange() {
+      const val = document.getElementById('formBusIn').value;
+      document.getElementById('formBusInTime').value = timeTables.busIn[val] || '';
+    }
+
+    function onBusOutChange() {
+      const val = document.getElementById('formBusOut').value;
+      document.getElementById('formBusOutTime').value = timeTables.busOut[val] || '';
+    }
+
+    function onFlightInChange() {
+      const val = document.getElementById('formFlightIn').value;
+      document.getElementById('formFlightInTime').value = timeTables.flightIn[val] || '';
+    }
+
+    function onFlightOutChange() {
+      const val = document.getElementById('formFlightOut').value;
+      document.getElementById('formFlightOutTime').value = timeTables.flightOut[val] || '';
+    }
+
+    window.onload = function() {
+      const savedUrl = localStorage.getItem('scriptApiUrl');
+      if (savedUrl) {
+        document.getElementById('scriptUrl').value = savedUrl;
+        loadData();
+      }
+    };
+
+    function saveApiUrl() {
+      const url = document.getElementById('scriptUrl').value.trim();
+      if (!url) {
+        alert('URL을 입력해주세요.');
+        return;
+      }
+      localStorage.setItem('scriptApiUrl', url);
+      alert('API URL이 저장되었습니다.');
+      loadData();
+    }
+
+    function getApiUrl() {
+      return localStorage.getItem('scriptApiUrl') || '';
+    }
+
+    async function loadData() {
+      const url = getApiUrl();
+      if (!url) {
+        alert('Google Apps Script URL을 먼저 설정해주세요.');
+        return;
+      }
+
+      try {
+        const res = await fetch(url, { redirect: 'follow' });
+        const data = await res.json();
+        
+        if (Array.isArray(data)) {
+          reservations = data;
+          renderTable();
+          updateSummary();
+          updateBusSummary();
+        } else {
+          alert('데이터 형식이 올바르지 않습니다.');
+        }
+      } catch (err) {
+        alert('데이터를 불러오는 도중 오류가 발생했습니다: ' + err.message);
+      }
+    }
+
+    function updateSummary() {
+      document.getElementById('newCount').innerText = reservations.filter(r => r.status === 'NEW').length + '건';
+      document.getElementById('activeCount').innerText = reservations.filter(r => (r.status || 'ACTIVE') === 'ACTIVE').length + '건';
+      document.getElementById('updatedCount').innerText = reservations.filter(r => r.status === 'UPDATED').length + '건';
+      document.getElementById('waitingCount').innerText = reservations.filter(r => r.status === 'WAITING').length + '건';
+      document.getElementById('cancelledCount').innerText = reservations.filter(r => r.status === 'CANCELLED').length + '건';
+    }
+
+    function updateBusSummary() {
+      busMapGlobal = {};
+
+      reservations.forEach(r => {
+        if (r.status === 'CANCELLED' || r.status === 'WAITING') return;
+        const pax = parseInt(r.pax) || 1;
+
+        if (r.checkIn && r.busIn) {
+          const key = `[IN] ${r.checkIn} \vert{}${r.busIn}`;
+          if (!busMapGlobal[key]) {
+            busMapGlobal[key] = { date: r.checkIn, type: 'IN', bus: r.busIn, pax: 0, count: 0, passengers: [] };
+          }
+          busMapGlobal[key].pax += pax;
+          busMapGlobal[key].count += 1;
+          busMapGlobal[key].passengers.push({ name: r.name || '미기재', pax: pax, status: r.status });
+        }
+
+        if (r.checkOut && r.busOut) {
+          const key = `[OUT] ${r.checkOut} \vert{}${r.busOut}`;
+          if (!busMapGlobal[key]) {
+            busMapGlobal[key] = { date: r.checkOut, type: 'OUT', bus: r.busOut, pax: 0, count: 0, passengers: [] };
+          }
+          busMapGlobal[key].pax += pax;
+          busMapGlobal[key].count += 1;
+          busMapGlobal[key].passengers.push({ name: r.name || '미기재', pax: pax, status: r.status });
+        }
+      });
+
+      const keys = Object.keys(busMapGlobal).sort();
+      const container = document.getElementById('busSummaryList');
+
+      if (keys.length === 0) {
+        container.innerHTML = `<div class="col-span-full text-center
