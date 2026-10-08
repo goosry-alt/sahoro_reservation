@@ -1,0 +1,1382 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <base target="_top">
+  <title>사호로리조트 예약현황 관리 시스템</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- 엑셀 다운로드를 위한 SheetJS CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    body { font-family: 'Noto Sans KR', sans-serif; }
+
+    .table-container {
+      max-height: 600px;
+      overflow: auto;
+      position: relative;
+    }
+    .table-container table {
+      border-separate: 0;
+      border-collapse: separate;
+      width: 100%;
+    }
+
+    /* 테이블 헤더 Sticky 고정 */
+    .table-container thead th {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background-color: #334155 !important;
+      color: #ffffff;
+      box-shadow: inset 0 -1px 0 #475569;
+    }
+
+    /* 좌측 열 고정 (Sticky Column) */
+    .sticky-col-1 { position: sticky; left: 0; z-index: 10; background-color: #ffffff; }
+    .sticky-col-2 { position: sticky; left: 70px; z-index: 10; background-color: #ffffff; }
+    .sticky-col-3 { position: sticky; left: 210px; z-index: 10; background-color: #ffffff; }
+
+    /* 교차점 (헤더 & 좌측 열 고정) z-index 우대 */
+    thead th.sticky-col-1,
+    thead th.sticky-col-2,
+    thead th.sticky-col-3 {
+      z-index: 30 !important;
+      background-color: #334155 !important;
+    }
+
+    /* 모달 헤더 드래그 커서 style */
+    .draggable-header {
+      cursor: move;
+      user-select: none;
+    }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen text-gray-800">
+
+  <!-- Header & Nav -->
+  <header class="bg-slate-800 text-white shadow-md">
+    <div class="max-w-7xl mx-auto px-4 py-4 flex flex-wrap justify-between items-center gap-4">
+      <h1 class="text-xl font-bold flex items-center gap-2">
+        <i class="fa-solid fa-hotel"></i> 사호로리조트 예약현황 관리
+      </h1>
+
+      <div class="flex items-center gap-2 flex-grow max-w-xl">
+        <input type="text" id="scriptUrl" placeholder="Google Apps Script URL을 입력하세요"
+               class="w-full px-3 py-1.5 text-sm text-gray-900 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <button type="button" onclick="saveApiUrl()" class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-1.5 rounded whitespace-nowrap font-medium transition">
+          URL 저장
+        </button>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button type="button" onclick="loadData()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm px-3 py-1.5 rounded font-medium transition flex items-center gap-1">
+          <i class="fa-solid fa-rotate"></i> 불러오기
+        </button>
+        <button type="button" onclick="openModal(-1)" class="bg-amber-600 hover:bg-amber-700 text-white text-sm px-3 py-1.5 rounded font-medium transition flex items-center gap-1">
+          <i class="fa-solid fa-plus"></i> 신규 예약
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="max-w-7xl mx-auto px-4 py-6 space-y-6">
+
+    <!-- 1. 동일 날짜 & 버스 이용 인원 자동 집계 현황 -->
+    <div class="bg-white rounded-lg shadow p-4 border border-gray-200">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="text-xs font-bold text-slate-700 uppercase flex items-center gap-1.5">
+          <i class="fa-solid fa-bus text-blue-600"></i> 동일 날짜/버스별 탑승 인원 현황
+        </h3>
+        <span class="text-[11px] text-gray-400">* 카드 클릭 시 버스별 예약자 명단을 확인할 수 있습니다.</span>
+      </div>
+
+      <div class="max-h-36 overflow-y-auto pr-1 border rounded bg-gray-50">
+        <div id="busSummaryList" class="p-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 text-xs">
+          <div class="col-span-full text-center text-gray-400 py-3">데이터를 불러오면 집계 정보가 표시됩니다.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. 상태별 요약 카운터 -->
+    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+      <div class="bg-white p-3 rounded-lg shadow border-l-4 border-sky-500">
+        <div class="text-gray-500 text-[11px] font-bold">신규 (NEW)</div>
+        <div id="newCount" class="text-xl font-bold mt-0.5 text-sky-600">0건</div>
+      </div>
+      <div class="bg-white p-3 rounded-lg shadow border-l-4 border-emerald-500">
+        <div class="text-gray-500 text-[11px] font-bold">확정 (ACTIVE)</div>
+        <div id="activeCount" class="text-xl font-bold mt-0.5 text-emerald-600">0건</div>
+      </div>
+      <div class="bg-white p-3 rounded-lg shadow border-l-4 border-indigo-500">
+        <div class="text-gray-500 text-[11px] font-bold">수정 (UPDATED)</div>
+        <div id="updatedCount" class="text-xl font-bold mt-0.5 text-indigo-600">0건</div>
+      </div>
+      <div class="bg-white p-3 rounded-lg shadow border-l-4 border-amber-500">
+        <div class="text-gray-500 text-[11px] font-bold">대기 (WAITING)</div>
+        <div id="waitingCount" class="text-xl font-bold mt-0.5 text-amber-600">0건</div>
+      </div>
+      <div class="bg-white p-3 rounded-lg shadow border-l-4 border-rose-500">
+        <div class="text-gray-500 text-[11px] font-bold">취소 (CANCELLED)</div>
+        <div id="cancelledCount" class="text-xl font-bold mt-0.5 text-rose-600">0건</div>
+      </div>
+    </div>
+
+    <!-- 3. 예약 현황 테이블 -->
+    <div class="bg-white rounded-lg shadow overflow-hidden border border-gray-200">
+      <div class="table-container">
+        <table class="w-full text-xs text-left text-gray-600">
+          <thead class="bg-slate-700 text-white uppercase text-[11px] tracking-wider">
+            <tr>
+              <th class="py-2 px-2 text-center sticky-col-1 w-[70px] min-w-[70px]">상태</th>
+              <th class="py-2 px-2 sticky-col-2 w-[140px] min-w-[140px]">체크인/아웃</th>
+              <th class="py-2 px-2 sticky-col-3 w-[100px] min-w-[100px]">예약자명</th>
+              <th class="py-2 px-2 text-center min-w-[80px]">인원/객실</th>
+              <th class="py-2 px-2 min-w-[170px]">송영버스(IN/OUT)</th>
+              <th class="py-2 px-2 min-w-[170px]">항공편(IN/OUT)</th>
+              <th class="py-2 px-2 min-w-[90px]">방배정</th>
+              <th class="py-2 px-2 min-w-[120px]">고객 메모</th>
+              <th class="py-2 px-2 min-w-[120px]">호텔 메모</th>
+              <th class="py-2 px-2 text-center w-[75px] min-w-[75px]">상세보기</th>
+              <th class="py-2 px-2 text-center w-[90px] min-w-[90px]">관리</th>
+            </tr>
+          </thead>
+          <tbody id="reservationTableBody" class="divide-y divide-gray-200">
+            <tr>
+              <td colspan="11" class="p-8 text-center text-gray-400">
+                데이터가 없습니다. [불러오기] 버튼을 클릭하세요.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <!-- 예약 상세보기 모달 팝업 -->
+  <div id="viewModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50 overflow-y-auto">
+    <div id="viewModalContainer" class="bg-white rounded-xl shadow-2xl w-full max-w-4xl my-8 overflow-hidden relative">
+      <div id="viewModalHeader" class="bg-slate-800 text-white px-6 py-4 flex justify-between items-center draggable-header">
+        <h3 class="text-lg font-bold flex items-center gap-2">
+          <i class="fa-solid fa-file-invoice"></i> 예약 상세 정보
+        </h3>
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="exportCompanionsToExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-1.5 rounded font-medium transition flex items-center gap-1">
+            <i class="fa-solid fa-file-excel"></i> 동행자 명단 엑셀 다운로드
+          </button>
+          <button type="button" onclick="closeViewModal()" class="text-gray-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+        </div>
+      </div>
+
+      <div class="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
+        <div id="viewModalContent" class="space-y-4">
+          <!-- 동적 생성 -->
+        </div>
+
+        <div>
+          <h4 class="font-semibold text-gray-700 border-b pb-2 mb-3 text-sm flex items-center gap-2">
+            <i class="fa-solid fa-users text-blue-600"></i> 동행인 명단
+          </h4>
+          <div class="overflow-x-auto">
+            <table class="w-full text-xs text-left border border-gray-200">
+              <thead class="bg-gray-100 border-b">
+                <tr>
+                  <th class="p-2 border-r">이름</th>
+                  <th class="p-2 w-16 text-center border-r">성별</th>
+                  <th class="p-2 w-24 border-r">방배정</th>
+                  <th class="p-2 w-14 text-center border-r">소아</th>
+                  <th class="p-2 border-r">생년월일</th>
+                  <th class="p-2 border-r">여권번호</th>
+                  <th class="p-2">여권유효기간</th>
+                </tr>
+              </thead>
+              <tbody id="viewCompanionTableBody" class="divide-y divide-gray-200">
+                <!-- 동적 생성 -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-gray-50 px-6 py-3 border-t text-right">
+        <button type="button" onclick="closeViewModal()" class="px-4 py-2 text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 rounded font-medium">닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 버스 탑승자 목록 모달 팝업 -->
+  <div id="busPassengerModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
+      <div class="bg-slate-800 text-white px-5 py-3 flex justify-between items-center">
+        <h3 id="busModalTitle" class="text-sm font-bold flex items-center gap-2">
+          <i class="fa-solid fa-bus text-blue-400"></i> 버스 탑승 명단
+        </h3>
+        <button type="button" onclick="closeBusModal()" class="text-gray-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+      <div class="p-4 space-y-3">
+        <div id="busModalSubTitle" class="text-xs text-slate-500 font-medium pb-2 border-b"></div>
+        <div class="max-h-60 overflow-y-auto">
+          <ul id="busPassengerList" class="divide-y divide-gray-100 text-xs">
+            <!-- 동적 탑승자 명단 -->
+          </ul>
+        </div>
+      </div>
+      <div class="bg-gray-50 px-4 py-2 border-t text-right">
+        <button type="button" onclick="closeBusModal()" class="px-3 py-1.5 text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 rounded font-medium">닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reservation Form Modal (예약수정창) -->
+  <div id="resModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50 overflow-y-auto">
+    <div id="resModalContainer" class="bg-white rounded-xl shadow-2xl w-full max-w-5xl my-8 overflow-hidden relative">
+      <div id="resModalHeader" class="bg-slate-800 text-white px-6 py-4 flex justify-between items-center draggable-header">
+        <h3 id="modalTitle" class="text-lg font-bold">예약 정보 수정</h3>
+        <button type="button" onclick="closeModal()" class="text-gray-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+      </div>
+
+      <form id="resForm" onsubmit="handleFormSubmit(event)" class="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
+        <input type="hidden" id="editIndex" value="-1">
+
+        <!-- 기본 정보 -->
+        <div>
+          <h4 class="font-semibold text-gray-700 border-b pb-2 mb-3 text-sm flex items-center gap-2">
+            <i class="fa-solid fa-user text-blue-600"></i> 기본 정보
+          </h4>
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <label class="block text-xs font-bold text-gray-600 mb-1">상태</label>
+              <select id="formStatus" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500 font-medium">
+                <option value="NEW">신규 (NEW)</option>
+                <option value="ACTIVE">확정 (ACTIVE)</option>
+                <option value="UPDATED">수정 (UPDATED)</option>
+                <option value="WAITING">대기 (WAITING)</option>
+                <option value="CANCELLED">취소 (CANCELLED)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-gray-600 mb-1">예약자명 *</label>
+              <input type="text" id="formName" required class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-gray-600 mb-1">체크인 (출발일) *</label>
+              <input type="date" id="formCheckIn" required onchange="onCheckInChange()" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-gray-600 mb-1">체크아웃 *</label>
+              <input type="date" id="formCheckOut" required onchange="calcNights()" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-gray-600 mb-1">박수</label>
+              <input type="number" id="formNights" min="0" value="0" readonly class="w-full text-xs p-2 border bg-gray-100 rounded">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-gray-600 mb-1">인원수 (PAX)</label>
+              <input type="number" id="formPax" min="1" value="1" oninput="updateCompanionsByPax()" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-gray-600 mb-1">객실수</label>
+              <input type="number" id="formRoom" min="1" value="1" oninput="updateCompanionRoomOptions()" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-gray-600 mb-1">리프트권</label>
+              <input type="text" id="formLift" placeholder="예: 3일권" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+            </div>
+          </div>
+        </div>
+
+        <!-- 교통 및 일정 정보 -->
+        <div>
+          <h4 class="font-semibold text-gray-700 border-b pb-2 mb-3 text-sm flex items-center gap-2">
+            <i class="fa-solid fa-plane text-blue-600"></i> 교통 및 일정 정보
+          </h4>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+            <!-- 송영버스 IN & 시각 -->
+            <div class="grid grid-cols-3 gap-2">
+              <div class="col-span-2">
+                <label class="block text-xs font-bold text-gray-600 mb-1">송영 버스 (IN)</label>
+                <select id="formBusIn" onchange="onBusInChange()" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+                  <option value="">-- 선택 없음 --</option>
+                  <option value="サホロEXP SAH03">サホロEXP SAH03</option>
+                  <option value="サホロEXP SAH07">サホロEXP SAH07</option>
+                  <option value="OBIHIRO">OBIHIRO</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-gray-600 mb-1">공항출발시각</label>
+                <input type="time" id="formBusInTime" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+              </div>
+            </div>
+
+            <!-- 송영버스 OUT & 시각 -->
+            <div class="grid grid-cols-3 gap-2">
+              <div class="col-span-2">
+                <label class="block text-xs font-bold text-gray-600 mb-1">송영 버스 (OUT)</label>
+                <select id="formBusOut" onchange="onBusOutChange()" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+                  <option value="">-- 선택 없음 --</option>
+                  <option value="サホロEXP SAH06">サホロEXP SAH06</option>
+                  <option value="サホロEXP SAH10">サホロEXP SAH10</option>
+                  <option value="OBIHIRO">OBIHIRO</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-gray-600 mb-1">호텔출발시각</label>
+                <input type="time" id="formBusOutTime" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+              </div>
+            </div>
+
+            <!-- 항공편 IN & 시각 -->
+            <div class="grid grid-cols-3 gap-2">
+              <div class="col-span-2">
+                <label class="block text-xs font-bold text-gray-600 mb-1">항공편 (IN)</label>
+                <select id="formFlightIn" onchange="onFlightInChange()" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+                  <option value="">-- 선택 없음 --</option>
+                  <option value="OZ174">OZ174</option>
+                  <option value="KE765">KE765</option>
+                  <option value="KE769">KE769</option>
+                  <option value="TW263">TW263</option>
+                  <option value="LJ203">LJ203</option>
+                  <option value="LJ207">LJ207</option>
+                  <option value="7C1501">7C1501</option>
+                  <option value="7C1503">7C1503</option>
+                  <option value="ZE625">ZE625</option>
+                  <option value="ZE623">ZE623</option>
+                  <option value="ZE621">ZE621</option>
+                  <option value="ZE627">ZE627</option>
+                  <option value="WE531">WE531</option>
+                  <option value="YP751">YP751</option>
+                  <option value="BX523">BX523</option>
+                  <option value="TW269">TW269</option>
+                  <option value="LJ527">LJ527</option>
+                  <option value="ZE951">ZE951</option>
+                  <option value="7C1551">7C1551</option>
+                  <option value="RF352">RF352</option>
+                  <option value="RF356">RF356</option>
+                  <option value="RF354">RF354</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-gray-600 mb-1">공항도착시각</label>
+                <input type="time" id="formFlightInTime" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+              </div>
+            </div>
+
+            <!-- 항공편 OUT & 시각 -->
+            <div class="grid grid-cols-3 gap-2">
+              <div class="col-span-2">
+                <label class="block text-xs font-bold text-gray-600 mb-1">항공편 (OUT)</label>
+                <select id="formFlightOut" onchange="onFlightOutChange()" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+                  <option value="">-- 선택 없음 --</option>
+                  <option value="OZ173">OZ173</option>
+                  <option value="KE766">KE766</option>
+                  <option value="KE770">KE770</option>
+                  <option value="TW264">TW264</option>
+                  <option value="LJ204">LJ204</option>
+                  <option value="LJ208">LJ208</option>
+                  <option value="7C1502">7C1502</option>
+                  <option value="7C1054">7C1054</option>
+                  <option value="ZE626">ZE626</option>
+                  <option value="ZE624">ZE624</option>
+                  <option value="ZE622">ZE622</option>
+                  <option value="ZE628">ZE628</option>
+                  <option value="WE532">WE532</option>
+                  <option value="YP752">YP752</option>
+                  <option value="BX524">BX524</option>
+                  <option value="TW270">TW270</option>
+                  <option value="LJ528">LJ528</option>
+                  <option value="ZE952">ZE952</option>
+                  <option value="7C1552">7C1552</option>
+                  <option value="RF351">RF351</option>
+                  <option value="RF355">RF355</option>
+                  <option value="RF353">RF353</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-gray-600 mb-1">공항출발시각</label>
+                <input type="time" id="formFlightOutTime" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- 방배정 및 기타 -->
+        <div>
+          <h4 class="font-semibold text-gray-700 border-b pb-2 mb-3 text-sm flex items-center gap-2">
+            <i class="fa-solid fa-bed text-blue-600"></i> 메모 및 기타
+          </h4>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label class="block text-xs font-bold text-gray-600 mb-1">방배정 (대표)</label>
+              <input type="text" id="formRoomAllocation" placeholder="예: 301호" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-gray-600 mb-1">고객 메모</label>
+              <input type="text" id="formMemo" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-gray-600 mb-1">호텔 메모</label>
+              <input type="text" id="formHotelMemo" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+            </div>
+          </div>
+        </div>
+
+        <!-- 동행인 명단 -->
+        <div>
+          <div class="flex justify-between items-center border-b pb-2 mb-3">
+            <h4 class="font-semibold text-gray-700 text-sm flex items-center gap-2">
+              <i class="fa-solid fa-users text-blue-600"></i> 동행인 명단
+            </h4>
+            <button type="button" onclick="addCompanionRow()" class="bg-slate-700 hover:bg-slate-800 text-white text-xs px-2.5 py-1 rounded transition">
+              + 동행인 추가
+            </button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-xs text-left">
+              <thead>
+                <tr class="bg-gray-100 border-b">
+                  <th class="p-2">이름</th>
+                  <th class="p-2 w-16 text-center">성별</th>
+                  <th class="p-2 w-24">방배정</th>
+                  <th class="p-2 w-14 text-center">어린이</th>
+                  <th class="p-2">생년월일</th>
+                  <th class="p-2">여권정보</th>
+                  <th class="p-2">유효기간</th>
+                  <th class="p-2 text-center w-12">삭제</th>
+                </tr>
+              </thead>
+              <tbody id="companionTableBody" class="divide-y divide-gray-200">
+                <!-- 동적 생성 -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="flex justify-end gap-2 pt-4 border-t">
+          <button type="button" onclick="closeModal()" class="px-4 py-2 text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 rounded font-medium">취소</button>
+          <button type="submit" id="btnSubmit" class="px-5 py-2 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded font-medium">저장하기</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    let reservations = [];
+    let busMapGlobal = {};
+    let currentViewingReservation = null;
+
+    const timeTables = {
+      busIn: {
+        "サホロEXP SAH03": "12:15",
+        "サホロEXP SAH07": "16:15",
+        "OBIHIRO": "17:00"
+      },
+      busOut: {
+        "サホロEXP SAH06": "08:20",
+        "サホロEXP SAH10": "12:30",
+        "OBIHIRO": "15:00"
+      },
+      flightIn: {
+        "OZ174": "10:45", "KE765": "12:50", "KE769": "15:40", "TW263": "13:10",
+        "LJ203": "11:15", "LJ207": "17:00", "7C1501": "10:00", "7C1503": "15:00",
+        "ZE625": "11:40", "ZE623": "17:05", "ZE621": "10:20", "ZE627": "12:55",
+        "WE531": "12:45", "YP751": "12:20", "BX523": "11:30", "TW269": "11:30",
+        "LJ527": "16:10", "ZE951": "17:00", "7C1551": "13:30", "RF352": "10:30",
+        "RF356": "16:00", "RF354": "16:15"
+      },
+      flightOut: {
+        "OZ173": "12:00", "KE766": "14:00", "KE770": "16:50", "TW264": "14:40",
+        "LJ204": "12:25", "LJ208": "18:00", "7C1502": "11:00", "7C1054": "16:00",
+        "ZE626": "13:00", "ZE624": "18:05", "ZE622": "11:20", "ZE628": "13:55",
+        "WE532": "14:05", "YP752": "13:45", "BX524": "12:30", "TW270": "12:30",
+        "LJ528": "17:10", "ZE952": "18:00", "7C1552": "14:30", "RF351": "11:30",
+        "RF355": "16:55", "RF353": "18:10"
+      }
+    };
+
+    window.addEventListener('DOMContentLoaded', () => {
+      const savedUrl = localStorage.getItem('scriptApiUrl');
+      if (savedUrl) {
+        document.getElementById('scriptUrl').value = savedUrl;
+      }
+
+      if (isGasHosted()) {
+        const urlInput = document.getElementById('scriptUrl');
+        urlInput.value = 'GAS 웹앱 내부 연결 사용 중';
+        urlInput.disabled = true;
+        urlInput.title = '현재 Google Apps Script 웹앱과 직접 연결되어 있습니다.';
+      }
+
+      makeElementDraggable(document.getElementById('resModalContainer'), document.getElementById('resModalHeader'));
+      makeElementDraggable(document.getElementById('viewModalContainer'), document.getElementById('viewModalHeader'));
+    });
+
+    function isGasHosted() {
+      return typeof google !== 'undefined' &&
+             google.script &&
+             typeof google.script.run !== 'undefined';
+    }
+
+    function getApiUrl() {
+      return document.getElementById('scriptUrl').value.trim();
+    }
+
+    function saveApiUrl() {
+      const url = getApiUrl();
+
+      if (url) {
+        localStorage.setItem('scriptApiUrl', url);
+      }
+
+      if (isGasHosted()) {
+        alert('현재 Google Apps Script 웹앱 내부에서 실행 중입니다.\n별도의 URL 입력 없이 자동으로 스프레드시트와 연결됩니다.');
+      } else if (url) {
+        alert('Google Apps Script URL이 저장되었습니다.\n단, 가장 안정적인 사용 방법은 GAS 웹앱 주소(/exec)로 이 프로그램을 직접 여는 것입니다.');
+      } else {
+        alert('URL을 입력하세요.');
+      }
+    }
+
+    function gasRun(functionName, ...args) {
+      return new Promise((resolve, reject) => {
+        if (!isGasHosted()) {
+          reject(new Error(
+            '현재 HTML이 Google Apps Script 웹앱 밖에서 실행되고 있습니다.\n' +
+            'GAS에서 배포한 웹앱의 /exec 주소를 브라우저로 열어 이 프로그램을 실행해주세요.'
+          ));
+          return;
+        }
+
+        let runner = google.script.run
+          .withSuccessHandler(resolve)
+          .withFailureHandler(err => {
+            reject(new Error(err && err.message ? err.message : String(err)));
+          });
+
+        runner[functionName](...args);
+      });
+    }
+
+    function makeElementDraggable(elmnt, header) {
+      let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+      if (header) {
+        header.onmousedown = dragMouseDown;
+      } else {
+        elmnt.onmousedown = dragMouseDown;
+      }
+
+      function dragMouseDown(e) {
+        if (['INPUT', 'BUTTON', 'I', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) return;
+        e = e || window.event;
+        e.preventDefault();
+        pos3 = e.clientX;
+        pos4 = e.clientY;
+        document.onmouseup = closeDragElement;
+        document.onmousemove = elementDrag;
+      }
+
+      function elementDrag(e) {
+        e = e || window.event;
+        e.preventDefault();
+        pos1 = pos3 - e.clientX;
+        pos2 = pos4 - e.clientY;
+        pos3 = e.clientX;
+        pos4 = e.clientY;
+
+        elmnt.style.position = 'absolute';
+        elmnt.style.top = Math.max(0, (elmnt.offsetTop - pos2)) + "px";
+        elmnt.style.left = Math.max(0, (elmnt.offsetLeft - pos1)) + "px";
+      }
+
+      function closeDragElement() {
+        document.onmouseup = null;
+        document.onmousemove = null;
+      }
+    }
+
+    function formatDateForInput(dateVal) {
+      if (!dateVal) return '';
+      if (typeof dateVal === 'string' && dateVal.length >= 10 && dateVal.match(/^\d{4}-\d{2}-\d{2}/)) {
+        return dateVal.substring(0, 10);
+      }
+      const d = new Date(dateVal);
+      if (isNaN(d.getTime())) return '';
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    function formatTime(t) {
+      if (!t) return '';
+      const str = String(t).trim();
+      if (str.includes("GMT") || str.includes("1899") || str.includes("Sat") || str.includes("Sun") || str.includes("Mon") || str.includes("Tue") || str.includes("Wed") || str.includes("Thu") || str.includes("Fri")) {
+        const match = str.match(/(\d{2}):(\d{2})/);
+        if (match) return match[1] + ':' + match[2];
+      }
+      if (str.length >= 5) return str.substring(0, 5);
+      return str;
+    }
+
+    function onBusInChange() {
+      const val = document.getElementById('formBusIn').value;
+      document.getElementById('formBusInTime').value = timeTables.busIn[val] || '';
+    }
+
+    function onBusOutChange() {
+      const val = document.getElementById('formBusOut').value;
+      document.getElementById('formBusOutTime').value = timeTables.busOut[val] || '';
+    }
+
+    function onFlightInChange() {
+      const val = document.getElementById('formFlightIn').value;
+      document.getElementById('formFlightInTime').value = timeTables.flightIn[val] || '';
+    }
+
+    function onFlightOutChange() {
+      const val = document.getElementById('formFlightOut').value;
+      document.getElementById('formFlightOutTime').value = timeTables.flightOut[val] || '';
+    }
+
+    function checkChildAge(birthInput) {
+      const tr = birthInput.closest('tr');
+      if (!tr) return;
+      const childCheckbox = tr.querySelector('.companion-child');
+      if (!childCheckbox) return;
+
+      const checkInVal = document.getElementById('formCheckIn').value;
+      const birthVal = birthInput.value;
+
+      if (!checkInVal || !birthVal) return;
+
+      const checkInDate = new Date(checkInVal);
+      const birthDate = new Date(birthVal);
+
+      if (isNaN(checkInDate.getTime()) || isNaN(birthDate.getTime())) return;
+
+      let age = checkInDate.getFullYear() - birthDate.getFullYear();
+      const m = checkInDate.getMonth() - birthDate.getMonth();
+      if (m < 0 || (m === 0 && checkInDate.getDate() < birthDate.getDate())) {
+        age--;
+      }
+
+      childCheckbox.checked = (age < 12);
+    }
+
+    function onCheckInChange() {
+      calcNights();
+      const birthInputs = document.querySelectorAll('.companion-birth');
+      birthInputs.forEach(input => checkChildAge(input));
+    }
+
+    function calcNights() {
+      const checkIn = document.getElementById('formCheckIn').value;
+      const checkOut = document.getElementById('formCheckOut').value;
+      if (checkIn && checkOut) {
+        const d1 = new Date(checkIn);
+        const d2 = new Date(checkOut);
+        const diff = Math.ceil((d2 - d1) / (1000 * 60 * 60 * 24));
+        document.getElementById('formNights').value = diff > 0 ? diff : 0;
+      }
+    }
+
+    function updateCompanionRoomOptions() {
+      const roomCount = parseInt(document.getElementById('formRoom').value) || 1;
+      const roomSelects = document.querySelectorAll('.companion-room');
+
+      roomSelects.forEach(select => {
+        const currentValue = select.value;
+        select.innerHTML = '';
+
+        for (let i = 1; i <= roomCount; i++) {
+          const optVal = `Room ${i}`;
+          const opt = document.createElement('option');
+          opt.value = optVal;
+          opt.textContent = optVal;
+          select.appendChild(opt);
+        }
+
+        if (currentValue && select.querySelector(`option[value="${currentValue}"]`)) {
+          select.value = currentValue;
+        }
+      });
+    }
+
+    function updateCompanionsByPax() {
+      const pax = parseInt(document.getElementById('formPax').value) || 1;
+      const tbody = document.getElementById('companionTableBody');
+      const currentRows = tbody.querySelectorAll('tr').length;
+
+      if (pax > currentRows) {
+        for (let i = currentRows; i < pax; i++) {
+          addCompanionRow();
+        }
+      } else if (pax < currentRows && pax >= 0) {
+        const rows = tbody.querySelectorAll('tr');
+        for (let i = currentRows - 1; i >= pax; i--) {
+          rows[i].remove();
+        }
+      }
+    }
+
+    function addCompanionRow(data = {}) {
+      const tbody = document.getElementById('companionTableBody');
+      const tr = document.createElement('tr');
+      tr.className = 'hover:bg-gray-50';
+
+      const roomCount = parseInt(document.getElementById('formRoom').value) || 1;
+      let roomOptionsHtml = '';
+      for (let i = 1; i <= roomCount; i++) {
+        const rVal = `Room ${i}`;
+        const selected = (data.room === rVal) ? 'selected' : '';
+        roomOptionsHtml += `<option value="${rVal}" ${selected}>${rVal}</option>`;
+      }
+
+      tr.innerHTML = `
+        <td class="p-1.5"><input type="text" value="${data.name || ''}" placeholder="성함" class="companion-name w-full p-1 border rounded text-xs"></td>
+        <td class="p-1.5 text-center">
+          <select class="companion-gender w-full p-1 border rounded text-xs">
+            <option value="M" ${data.gender === 'M' ? 'selected' : ''}>남</option>
+            <option value="F" ${data.gender === 'F' ? 'selected' : ''}>여</option>
+          </select>
+        </td>
+        <td class="p-1.5">
+          <select class="companion-room w-full p-1 border rounded text-xs">
+            ${roomOptionsHtml}
+          </select>
+        </td>
+        <td class="p-1.5 text-center">
+          <input type="checkbox" class="companion-child" ${data.isChild ? 'checked' : ''}>
+        </td>
+        <td class="p-1.5">
+          <input type="date" value="${formatDateForInput(data.birth) || ''}" class="companion-birth w-full p-1 border rounded text-xs" onchange="checkChildAge(this)">
+        </td>
+        <td class="p-1.5">
+          <input type="text" value="${data.passport || ''}" placeholder="여권번호" class="companion-passport w-full p-1 border rounded text-xs">
+        </td>
+        <td class="p-1.5">
+          <input type="date" value="${formatDateForInput(data.passportExpiry) || ''}" class="companion-expiry w-full p-1 border rounded text-xs">
+        </td>
+        <td class="p-1.5 text-center">
+          <button type="button" onclick="deleteCompanionRow(this)" class="text-red-500 hover:text-red-700">
+            <i class="fa-solid fa-trash"></i>
+          </button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+      
+      // 행 추가 시 인원수(PAX) 동기화
+      document.getElementById('formPax').value = tbody.querySelectorAll('tr').length;
+    }
+
+    // =========================
+    // 예약 데이터 / API 처리
+    // =========================
+    function normalizeReservation(raw = {}) {
+      const r = { ...raw };
+      // GAS가 내려준 실제 스프레드시트 행 번호를 보존합니다.
+      r._sheetRow = raw._sheetRow ?? raw.sheetRow ?? null;
+
+      // GAS/Sheets에서 흔히 쓰는 헤더명도 일부 허용
+      r.status = r.status ?? r.Status ?? r['상태'] ?? 'NEW';
+      r.name = r.name ?? r.reserverName ?? r['예약자명'] ?? '';
+      r.checkIn = r.checkIn ?? r.checkin ?? r['체크인'] ?? '';
+      r.checkOut = r.checkOut ?? r.checkout ?? r['체크아웃'] ?? '';
+      r.nights = Number(r.nights ?? r['박수'] ?? 0) || 0;
+      r.pax = Number(r.pax ?? r.PAX ?? r['인원수'] ?? 1) || 1;
+      r.room = Number(r.room ?? r.rooms ?? r['객실수'] ?? 1) || 1;
+      r.lift = r.lift ?? r['리프트권'] ?? '';
+      r.busIn = r.busIn ?? r['송영버스(IN)'] ?? '';
+      r.busInTime = r.busInTime ?? r['송영버스(IN)시간'] ?? '';
+      r.busOut = r.busOut ?? r['송영버스(OUT)'] ?? '';
+      r.busOutTime = r.busOutTime ?? r['송영버스(OUT)시간'] ?? '';
+      r.flightIn = r.flightIn ?? r['항공편(IN)'] ?? '';
+      r.flightInTime = r.flightInTime ?? r['항공편(IN)시간'] ?? '';
+      r.flightOut = r.flightOut ?? r['항공편(OUT)'] ?? '';
+      r.flightOutTime = r.flightOutTime ?? r['항공편(OUT)시간'] ?? '';
+      r.roomAllocation = r.roomAllocation ?? r['방배정'] ?? '';
+      r.memo = r.memo ?? r['고객 메모'] ?? '';
+      r.hotelMemo = r.hotelMemo ?? r['호텔 메모'] ?? '';
+      r.companions = Array.isArray(r.companions)
+        ? r.companions
+        : Array.isArray(r.companionList)
+          ? r.companionList
+          : [];
+      return r;
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function statusLabel(status) {
+      const map = {
+        NEW: ['신규', 'bg-sky-100 text-sky-700'],
+        ACTIVE: ['확정', 'bg-emerald-100 text-emerald-700'],
+        UPDATED: ['수정', 'bg-indigo-100 text-indigo-700'],
+        WAITING: ['대기', 'bg-amber-100 text-amber-700'],
+        CANCELLED: ['취소', 'bg-rose-100 text-rose-700']
+      };
+      return map[status] || [status || '-', 'bg-gray-100 text-gray-700'];
+    }
+
+    function calculateNightsValue(checkIn, checkOut) {
+      if (!checkIn || !checkOut) return 0;
+      const d1 = new Date(`${checkIn}T00:00:00`);
+      const d2 = new Date(`${checkOut}T00:00:00`);
+      const diff = Math.round((d2 - d1) / 86400000);
+      return diff > 0 ? diff : 0;
+    }
+
+    function reservationToPayload(r) {
+      return {
+        action: r._isNew ? 'create' : 'update',
+        index: r._index ?? null,
+        sheetRow: r._sheetRow ?? null,
+        reservation: {
+          status: r.status,
+          name: r.name,
+          checkIn: r.checkIn,
+          checkOut: r.checkOut,
+          nights: r.nights,
+          pax: r.pax,
+          room: r.room,
+          lift: r.lift,
+          busIn: r.busIn,
+          busInTime: r.busInTime,
+          busOut: r.busOut,
+          busOutTime: r.busOutTime,
+          flightIn: r.flightIn,
+          flightInTime: r.flightInTime,
+          flightOut: r.flightOut,
+          flightOutTime: r.flightOutTime,
+          roomAllocation: r.roomAllocation,
+          memo: r.memo,
+          hotelMemo: r.hotelMemo,
+          companions: r.companions
+        }
+      };
+    }
+
+    async function apiRequest(method, payload = null) {
+      // GAS 웹앱 안에서 실행할 때는 CORS가 없는 google.script.run을 사용합니다.
+      if (isGasHosted()) {
+        if (method === 'GET') {
+          return await gasRun('getReservations');
+        }
+
+        if (method === 'POST') {
+          if (payload && payload.action === 'delete') {
+            return await gasRun('deleteReservation', payload.sheetRow, payload.index);
+          }
+          return await gasRun('saveReservation', payload);
+        }
+      }
+
+      // 외부 HTML에서 실행하는 경우의 호환용.
+      // 단, Apps Script 웹앱의 브라우저 CORS 제약 때문에 권장하지 않습니다.
+      const url = getApiUrl();
+      if (!url) {
+        throw new Error(
+          'Google Apps Script 웹앱 주소가 없습니다.\n' +
+          'GAS에서 배포한 /exec 주소를 브라우저로 열어주세요.'
+        );
+      }
+
+      const options = {
+        method,
+        redirect: 'follow',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+      };
+
+      if (payload !== null) options.body = JSON.stringify(payload);
+
+      const response = await fetch(url, options);
+      const text = await response.text();
+
+      let data;
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        throw new Error(`서버 응답이 JSON 형식이 아닙니다.\n${text.substring(0, 300)}`);
+      }
+
+      if (!response.ok) {
+        throw new Error(data.message || `HTTP ${response.status}`);
+      }
+
+      if (data.success === false) {
+        throw new Error(data.message || 'Google Apps Script에서 오류를 반환했습니다.');
+      }
+
+      return data;
+    }
+
+    // =========================
+    // 화면 렌더링
+    // =========================
+    function renderReservations() {
+      const tbody = document.getElementById('reservationTableBody');
+
+      if (!reservations.length) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="11" class="p-8 text-center text-gray-400">
+              데이터가 없습니다.
+            </td>
+          </tr>`;
+        updateCounters();
+        renderBusSummary();
+        return;
+      }
+
+      tbody.innerHTML = reservations.map((raw, index) => {
+        const r = normalizeReservation(raw);
+        r._index = index;
+        const [label, cls] = statusLabel(r.status);
+
+        const busText = [
+          r.busIn ? `IN: ${r.busIn}${r.busInTime ? ` (${formatTime(r.busInTime)})` : ''}` : '',
+          r.busOut ? `OUT: ${r.busOut}${r.busOutTime ? ` (${formatTime(r.busOutTime)})` : ''}` : ''
+        ].filter(Boolean).join('<br>') || '-';
+
+        const flightText = [
+          r.flightIn ? `IN: ${r.flightIn}${r.flightInTime ? ` (${formatTime(r.flightInTime)})` : ''}` : '',
+          r.flightOut ? `OUT: ${r.flightOut}${r.flightOutTime ? ` (${formatTime(r.flightOutTime)})` : ''}` : ''
+        ].filter(Boolean).join('<br>') || '-';
+
+        return `
+          <tr class="hover:bg-slate-50">
+            <td class="py-2 px-2 text-center sticky-col-1">
+              <span class="inline-block px-2 py-1 rounded-full font-bold ${cls}">${escapeHtml(label)}</span>
+            </td>
+            <td class="py-2 px-2 sticky-col-2">
+              <div class="font-medium">${escapeHtml(formatDateForInput(r.checkIn) || '-')}</div>
+              <div class="text-gray-400">${escapeHtml(formatDateForInput(r.checkOut) || '-')} / ${r.nights || calculateNightsValue(r.checkIn, r.checkOut)}박</div>
+            </td>
+            <td class="py-2 px-2 sticky-col-3 font-bold text-gray-800">${escapeHtml(r.name || '-')}</td>
+            <td class="py-2 px-2 text-center">${r.pax || 0}명 / ${r.room || 0}실</td>
+            <td class="py-2 px-2 leading-5">${busText}</td>
+            <td class="py-2 px-2 leading-5">${flightText}</td>
+            <td class="py-2 px-2">${escapeHtml(r.roomAllocation || '-')}</td>
+            <td class="py-2 px-2">${escapeHtml(r.memo || '-')}</td>
+            <td class="py-2 px-2">${escapeHtml(r.hotelMemo || '-')}</td>
+            <td class="py-2 px-2 text-center">
+              <button type="button" onclick="viewReservation(${index})"
+                class="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded text-slate-700">
+                보기
+              </button>
+            </td>
+            <td class="py-2 px-2 text-center whitespace-nowrap">
+              <button type="button" onclick="openModal(${index})"
+                class="px-2 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded mr-1">수정</button>
+              <button type="button" onclick="deleteReservation(${index})"
+                class="px-2 py-1 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded">삭제</button>
+            </td>
+          </tr>`;
+      }).join('');
+
+      updateCounters();
+      renderBusSummary();
+    }
+
+    function updateCounters() {
+      const counts = { NEW: 0, ACTIVE: 0, UPDATED: 0, WAITING: 0, CANCELLED: 0 };
+      reservations.forEach(r => {
+        const status = normalizeReservation(r).status;
+        if (counts[status] !== undefined) counts[status]++;
+      });
+      document.getElementById('newCount').textContent = `${counts.NEW}건`;
+      document.getElementById('activeCount').textContent = `${counts.ACTIVE}건`;
+      document.getElementById('updatedCount').textContent = `${counts.UPDATED}건`;
+      document.getElementById('waitingCount').textContent = `${counts.WAITING}건`;
+      document.getElementById('cancelledCount').textContent = `${counts.CANCELLED}건`;
+    }
+
+    function renderBusSummary() {
+      const container = document.getElementById('busSummaryList');
+      const map = {};
+
+      reservations.forEach((raw, index) => {
+        const r = normalizeReservation(raw);
+        const add = (date, bus, direction) => {
+          if (!date || !bus) return;
+          const key = `${date}|${direction}|${bus}`;
+          if (!map[key]) map[key] = { date, bus, direction, pax: 0, reservations: [] };
+          map[key].pax += Number(r.pax) || 0;
+          map[key].reservations.push(index);
+        };
+        add(formatDateForInput(r.checkIn), r.busIn, 'IN');
+        add(formatDateForInput(r.checkOut), r.busOut, 'OUT');
+      });
+
+      busMapGlobal = map;
+      const items = Object.values(map).sort((a, b) =>
+        `${a.date}${a.direction}${a.bus}`.localeCompare(`${b.date}${b.direction}${b.bus}`)
+      );
+
+      if (!items.length) {
+        container.innerHTML = `<div class="col-span-full text-center text-gray-400 py-3">버스 집계 데이터가 없습니다.</div>`;
+        return;
+      }
+
+      container.innerHTML = items.map(item => {
+        const key = `${item.date}|${item.direction}|${item.bus}`;
+        return `
+          <button type="button" onclick="showBusPassengers(${JSON.stringify(key)})"
+            class="text-left p-2 bg-white border rounded hover:border-blue-400 hover:shadow-sm transition">
+            <div class="font-bold text-slate-700">${escapeHtml(item.date)} · ${escapeHtml(item.direction)}</div>
+            <div class="text-blue-700 font-semibold">${escapeHtml(item.bus)}</div>
+            <div class="text-gray-500 mt-0.5">${item.pax}명</div>
+          </button>`;
+      }).join('');
+    }
+
+    // =========================
+    // 모달
+    // =========================
+    function fillFormFromReservation(raw) {
+      const r = normalizeReservation(raw);
+
+      document.getElementById('formStatus').value = r.status || 'NEW';
+      document.getElementById('formName').value = r.name || '';
+      document.getElementById('formCheckIn').value = formatDateForInput(r.checkIn);
+      document.getElementById('formCheckOut').value = formatDateForInput(r.checkOut);
+      document.getElementById('formNights').value = r.nights || calculateNightsValue(r.checkIn, r.checkOut);
+      document.getElementById('formPax').value = r.pax || 1;
+      document.getElementById('formRoom').value = r.room || 1;
+      document.getElementById('formLift').value = r.lift || '';
+      document.getElementById('formBusIn').value = r.busIn || '';
+      document.getElementById('formBusInTime').value = formatTime(r.busInTime);
+      document.getElementById('formBusOut').value = r.busOut || '';
+      document.getElementById('formBusOutTime').value = formatTime(r.busOutTime);
+      document.getElementById('formFlightIn').value = r.flightIn || '';
+      document.getElementById('formFlightInTime').value = formatTime(r.flightInTime);
+      document.getElementById('formFlightOut').value = r.flightOut || '';
+      document.getElementById('formFlightOutTime').value = formatTime(r.flightOutTime);
+      document.getElementById('formRoomAllocation').value = r.roomAllocation || '';
+      document.getElementById('formMemo').value = r.memo || '';
+      document.getElementById('formHotelMemo').value = r.hotelMemo || '';
+
+      const tbody = document.getElementById('companionTableBody');
+      tbody.innerHTML = '';
+      const companions = r.companions.length ? r.companions : [{}];
+      companions.forEach(c => addCompanionRow(c));
+      document.getElementById('formPax').value = r.pax || companions.length || 1;
+      updateCompanionRoomOptions();
+      calcNights();
+    }
+
+    function openModal(index) {
+      const modal = document.getElementById('resModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      document.getElementById('editIndex').value = index;
+
+      if (index === -1) {
+        document.getElementById('modalTitle').textContent = '신규 예약 등록';
+        document.getElementById('resForm').reset();
+        document.getElementById('formStatus').value = 'NEW';
+        document.getElementById('formPax').value = 1;
+        document.getElementById('formRoom').value = 1;
+        document.getElementById('companionTableBody').innerHTML = '';
+        addCompanionRow();
+      } else {
+        document.getElementById('modalTitle').textContent = '예약 정보 수정';
+        fillFormFromReservation(reservations[index]);
+      }
+    }
+
+    function closeModal() {
+      const modal = document.getElementById('resModal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function viewReservation(index) {
+      const r = normalizeReservation(reservations[index]);
+      currentViewingReservation = r;
+
+      document.getElementById('viewModalContent').innerHTML = `
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+          <div><div class="text-gray-400">상태</div><div class="font-bold">${escapeHtml(r.status)}</div></div>
+          <div><div class="text-gray-400">예약자</div><div class="font-bold">${escapeHtml(r.name)}</div></div>
+          <div><div class="text-gray-400">체크인</div><div>${escapeHtml(formatDateForInput(r.checkIn))}</div></div>
+          <div><div class="text-gray-400">체크아웃</div><div>${escapeHtml(formatDateForInput(r.checkOut))}</div></div>
+          <div><div class="text-gray-400">인원/객실</div><div>${r.pax}명 / ${r.room}실</div></div>
+          <div><div class="text-gray-400">방배정</div><div>${escapeHtml(r.roomAllocation || '-')}</div></div>
+          <div><div class="text-gray-400">IN 버스</div><div>${escapeHtml(r.busIn || '-')} ${escapeHtml(formatTime(r.busInTime))}</div></div>
+          <div><div class="text-gray-400">OUT 버스</div><div>${escapeHtml(r.busOut || '-')} ${escapeHtml(formatTime(r.busOutTime))}</div></div>
+          <div><div class="text-gray-400">IN 항공</div><div>${escapeHtml(r.flightIn || '-')} ${escapeHtml(formatTime(r.flightInTime))}</div></div>
+          <div><div class="text-gray-400">OUT 항공</div><div>${escapeHtml(r.flightOut || '-')} ${escapeHtml(formatTime(r.flightOutTime))}</div></div>
+          <div class="md:col-span-2"><div class="text-gray-400">고객 메모</div><div>${escapeHtml(r.memo || '-')}</div></div>
+          <div class="md:col-span-2"><div class="text-gray-400">호텔 메모</div><div>${escapeHtml(r.hotelMemo || '-')}</div></div>
+        </div>`;
+
+      const tbody = document.getElementById('viewCompanionTableBody');
+      tbody.innerHTML = r.companions.length
+        ? r.companions.map(c => `
+          <tr>
+            <td class="p-2 border-r">${escapeHtml(c.name || '')}</td>
+            <td class="p-2 text-center border-r">${escapeHtml(c.gender || '')}</td>
+            <td class="p-2 border-r">${escapeHtml(c.room || '')}</td>
+            <td class="p-2 text-center border-r">${c.isChild ? 'O' : ''}</td>
+            <td class="p-2 border-r">${escapeHtml(formatDateForInput(c.birth) || '')}</td>
+            <td class="p-2 border-r">${escapeHtml(c.passport || '')}</td>
+            <td class="p-2">${escapeHtml(formatDateForInput(c.passportExpiry) || '')}</td>
+          </tr>`).join('')
+        : `<tr><td colspan="7" class="p-4 text-center text-gray-400">동행인이 없습니다.</td></tr>`;
+
+      const modal = document.getElementById('viewModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closeViewModal() {
+      const modal = document.getElementById('viewModal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+      currentViewingReservation = null;
+    }
+
+    function showBusPassengers(key) {
+      const item = busMapGlobal[key];
+      if (!item) return;
+
+      document.getElementById('busModalTitle').innerHTML =
+        `<i class="fa-solid fa-bus text-blue-400"></i> ${escapeHtml(item.bus)}`;
+      document.getElementById('busModalSubTitle').textContent =
+        `${item.date} · ${item.direction} · ${item.pax}명`;
+
+      const passengers = [];
+      item.reservations.forEach(index => {
+        const r = normalizeReservation(reservations[index]);
+        if (r.companions.length) {
+          r.companions.forEach(c => passengers.push({
+            name: c.name || r.name,
+            pax: 1
+          }));
+        } else {
+          passengers.push({ name: r.name, pax: r.pax });
+        }
+      });
+
+      document.getElementById('busPassengerList').innerHTML =
+        passengers.map((p, i) => `
+          <li class="py-2 flex justify-between">
+            <span>${i + 1}. ${escapeHtml(p.name || '-')}</span>
+            <span class="text-gray-400">${p.pax > 1 ? `${p.pax}명` : ''}</span>
+          </li>`).join('');
+
+      const modal = document.getElementById('busPassengerModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closeBusModal() {
+      const modal = document.getElementById('busPassengerModal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    // =========================
+    // 동행인
+    // =========================
+    function deleteCompanionRow(btn) {
+      const row = btn.closest('tr');
+      if (row) row.remove();
+      const count = document.querySelectorAll('#companionTableBody tr').length;
+      document.getElementById('formPax').value = Math.max(1, count);
+    }
+
+    function collectCompanions() {
+      return [...document.querySelectorAll('#companionTableBody tr')].map(tr => ({
+        name: tr.querySelector('.companion-name')?.value.trim() || '',
+        gender: tr.querySelector('.companion-gender')?.value || '',
+        room: tr.querySelector('.companion-room')?.value || '',
+        isChild: !!tr.querySelector('.companion-child')?.checked,
+        birth: tr.querySelector('.companion-birth')?.value || '',
+        passport: tr.querySelector('.companion-passport')?.value.trim() || '',
+        passportExpiry: tr.querySelector('.companion-expiry')?.value || ''
+      }));
+    }
+
+    // =========================
+    // CRUD
+    // =========================
+    async function loadData() {
+      const url = getApiUrl();
+      if (!url) {
+        alert("Google Apps Script URL을 먼저 저장해주세요.");
+        return;
+      }
+
+      try {
+        const data = await apiRequest('GET');
+        const rows = Array.isArray(data) ? data
+          : Array.isArray(data.data) ? data.data
+          : Array.isArray(data.reservations) ? data.reservations
+          : [];
+
+        reservations = rows.map(normalizeReservation);
+        renderReservations();
+
+        if (!rows.length) {
+          alert('서버에서 예약 데이터를 찾지 못했습니다. GAS의 GET 응답 형식을 확인해주세요.');
+        }
+      } catch (error) {
+        console.error(error);
+        alert(`데이터 불러오기 실패\n\n${error.message}`);
+      }
+    }
+
+    async function handleFormSubmit(e) {
+      e.preventDefault();
+
+      const index = Number(document.getElementById('editIndex').value);
+      const existing = index >= 0 ? normalizeReservation(reservations[index]) : {};
+      const companions = collectCompanions();
+
+      const reservation = {
+        ...existing,
+        status: document.getElementById('formStatus').value,
+        name: document.getElementById('formName').value.trim(),
+        checkIn: document.getElementById('formCheckIn').value,
+        checkOut: document.getElementById('formCheckOut').value,
+        nights: calculateNightsValue(
+          document.getElementById('formCheckIn').value,
+          document.getElementById('formCheckOut').value
+        ),
+        pax: Math.max(1, Number(document.getElementById('formPax').value) || 1),
+        room: Math.max(1, Number(document.getElementById('formRoom').value) || 1),
+        lift: document.getElementById('formLift').value.trim(),
+        busIn: document.getElementById('formBusIn').value,
+        busInTime: document.getElementById('formBusInTime').value,
+        busOut: document.getElementById('formBusOut').value,
+        busOutTime: document.getElementById('formBusOutTime').value,
+        flightIn: document.getElementById('formFlightIn').value,
+        flightInTime: document.getElementById('formFlightInTime').value,
+        flightOut: document.getElementById('formFlightOut').value,
+        flightOutTime: document.getElementById('formFlightOutTime').value,
+        roomAllocation: document.getElementById('formRoomAllocation').value.trim(),
+        memo: document.getElementById('formMemo').value.trim(),
+        hotelMemo: document.getElementById('formHotelMemo').value.trim(),
+        companions
+      };
+
+      if (!reservation.name || !reservation.checkIn || !reservation.checkOut) {
+        alert('예약자명, 체크인, 체크아웃은 필수입니다.');
+        return;
+      }
+
+      const btn = document.getElementById('btnSubmit');
+      const oldText = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = '저장 중...';
+
+      try {
+        const payload = reservationToPayload({
+          ...reservation,
+          _isNew: index < 0,
+          _index: index
+        });
+
+        const result = await apiRequest('POST', payload);
+        console.log('저장 결과:', result);
+
+        alert(result.message || '예약 정보가 저장되었습니다.');
+        closeModal();
+        await loadData();
+      } catch (error) {
+        console.error(error);
+        alert(`저장 실패\n\n${error.message}`);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = oldText;
+      }
+    }
+
+    async function deleteReservation(index) {
+      const r = normalizeReservation(reservations[index]);
+      if (!confirm(`"${r.name}" 예약을 삭제하시겠습니까?`)) return;
+
+      try {
+        await apiRequest('POST', {
+          action: 'delete',
+          index,
+          sheetRow: r._sheetRow,
+          reservation: r
+        });
+        alert('예약이 삭제되었습니다.');
+        await loadData();
+      } catch (error) {
+        console.error(error);
+        alert(`삭제 실패\n\n${error.message}`);
+      }
+    }
+
+    // =========================
+    // 엑셀
+    // =========================
+    function exportCompanionsToExcel() {
+      if (!currentViewingReservation) {
+        alert('상세보기에서 예약을 먼저 선택해주세요.');
+        return;
+      }
+
+      const r = normalizeReservation(currentViewingReservation);
+      const rows = r.companions.map(c => ({
+        예약자명: r.name,
+        체크인: formatDateForInput(r.checkIn),
+        체크아웃: formatDateForInput(r.checkOut),
+        이름: c.name || '',
+        성별: c.gender === 'M' ? '남' : c.gender === 'F' ? '여' : '',
+        방배정: c.room || '',
+        소아: c.isChild ? 'O' : '',
+        생년월일: formatDateForInput(c.birth),
+        여권번호: c.passport || '',
+        여권유효기간: formatDateForInput(c.passportExpiry)
+      }));
+
+      if (!rows.length) {
+        alert('다운로드할 동행인 데이터가 없습니다.');
+        return;
+      }
+
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, '동행인');
+      XLSX.writeFile(wb, `동행인_${r.name || '예약자'}_${formatDateForInput(r.checkIn) || ''}.xlsx`);
+    }
+
+    // =========================
+    // 초기화
+    // =========================
+    window.addEventListener('DOMContentLoaded', () => {
+      const savedUrl = localStorage.getItem('scriptApiUrl');
+      if (savedUrl) document.getElementById('scriptUrl').value = savedUrl;
+
+      makeElementDraggable(
+        document.getElementById('resModalContainer'),
+        document.getElementById('resModalHeader')
+      );
+      makeElementDraggable(
+        document.getElementById('viewModalContainer'),
+        document.getElementById('viewModalHeader')
+      );
+
+      // URL이 저장되어 있으면 자동 로드
+      if (savedUrl) loadData();
+    });
+  </script>
+</body>
+</html>
