@@ -513,6 +513,13 @@
 
       makeElementDraggable(document.getElementById('resModalContainer'), document.getElementById('resModalHeader'));
       makeElementDraggable(document.getElementById('viewModalContainer'), document.getElementById('viewModalHeader'));
+
+      // GAS 웹앱으로 열었으면 URL과 무관하게 자동으로 데이터를 불러옵니다.
+      if (isGasHosted()) {
+        setTimeout(() => loadData(), 150);
+      } else if (savedUrl) {
+        loadData();
+      }
     });
 
     function isGasHosted() {
@@ -1215,7 +1222,10 @@
     // =========================
     async function loadData() {
       const url = getApiUrl();
-      if (!url) {
+
+      // GAS 웹앱 내부에서는 URL 입력값이 필요 없습니다.
+      // google.script.run으로 현재 Apps Script 프로젝트의 서버 함수를 직접 호출합니다.
+      if (!isGasHosted() && !url) {
         alert("Google Apps Script URL을 먼저 저장해주세요.");
         return;
       }
@@ -1358,25 +1368,6 @@
       XLSX.writeFile(wb, `동행인_${r.name || '예약자'}_${formatDateForInput(r.checkIn) || ''}.xlsx`);
     }
 
-    // =========================
-    // 초기화
-    // =========================
-    window.addEventListener('DOMContentLoaded', () => {
-      const savedUrl = localStorage.getItem('scriptApiUrl');
-      if (savedUrl) document.getElementById('scriptUrl').value = savedUrl;
-
-      makeElementDraggable(
-        document.getElementById('resModalContainer'),
-        document.getElementById('resModalHeader')
-      );
-      makeElementDraggable(
-        document.getElementById('viewModalContainer'),
-        document.getElementById('viewModalHeader')
-      );
-
-      // URL이 저장되어 있으면 자동 로드
-      if (savedUrl) loadData();
-    });
   </script>
 </body>
 </html>
