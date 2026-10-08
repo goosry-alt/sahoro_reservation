@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <base target="_top">
   <title>사호로리조트 예약현황 관리 시스템</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -59,6 +60,7 @@
     <div class="max-w-7xl mx-auto px-4 py-4 flex flex-wrap justify-between items-center gap-4">
       <h1 class="text-xl font-bold flex items-center gap-2">
         <i class="fa-solid fa-hotel"></i> 사호로리조트 예약현황 관리
+        <span id="appVersion" class="text-[10px] font-normal bg-slate-700 px-2 py-1 rounded">FINAL-2026-10-08</span>
       </h1>
 
       <div class="flex items-center gap-2 flex-grow max-w-xl">
@@ -79,6 +81,10 @@
       </div>
     </div>
   </header>
+
+  <div id="connectionStatus" class="max-w-7xl mx-auto px-4 pt-3 text-xs">
+    <div class="bg-white border rounded px-3 py-2 text-slate-500">연결 확인 중...</div>
+  </div>
 
   <!-- Main Content -->
   <main class="max-w-7xl mx-auto px-4 py-6 space-y-6">
@@ -499,12 +505,47 @@
 
     window.addEventListener('DOMContentLoaded', () => {
       const savedUrl = localStorage.getItem('scriptApiUrl');
-      if (savedUrl) {
-        document.getElementById('scriptUrl').value = savedUrl;
+      const urlInput = document.getElementById('scriptUrl');
+
+      if (isGasHosted()) {
+        urlInput.value = 'GAS 웹앱 내부 연결 사용 중';
+        urlInput.disabled = true;
+        urlInput.title = '현재 Google Apps Script 웹앱과 직접 연결되어 있습니다.';
+      } else if (savedUrl) {
+        urlInput.value = savedUrl;
       }
+
       makeElementDraggable(document.getElementById('resModalContainer'), document.getElementById('resModalHeader'));
       makeElementDraggable(document.getElementById('viewModalContainer'), document.getElementById('viewModalHeader'));
+
+      setConnectionStatus(isGasHosted()
+        ? 'GAS 웹앱 내부 연결 감지됨 — 스프레드시트 연결을 확인하는 중...'
+        : 'GAS 웹앱이 아닌 일반 HTML로 열려 있습니다. /exec 주소로 열어주세요.',
+        isGasHosted() ? 'info' : 'error');
+
+      if (isGasHosted()) {
+        setTimeout(() => loadData(), 150);
+      } else if (savedUrl) {
+        loadData();
+      }
     });
+
+    function setConnectionStatus(message, type = 'info') {
+      const el = document.getElementById('connectionStatus');
+      if (!el) return;
+      const cls = type === 'ok'
+        ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
+        : type === 'error'
+          ? 'bg-rose-50 border-rose-300 text-rose-700'
+          : 'bg-amber-50 border-amber-300 text-amber-700';
+      el.innerHTML = `<div class="border rounded px-3 py-2 ${cls}">${escapeHtml(message)}</div>`;
+    }
+
+    function isGasHosted() {
+      return typeof google !== 'undefined' &&
+             google.script &&
+             typeof google.script.run !== 'undefined';
+    }
 
     function getApiUrl() {
       return document.getElementById('scriptUrl').value.trim();
@@ -512,12 +553,38 @@
 
     function saveApiUrl() {
       const url = getApiUrl();
-      if (!url) {
-        alert('URL을 입력하세요.');
-        return;
+
+      if (url) {
+        localStorage.setItem('scriptApiUrl', url);
       }
-      localStorage.setItem('scriptApiUrl', url);
-      alert('Google Apps Script URL이 저장되었습니다.');
+
+      if (isGasHosted()) {
+        alert('현재 Google Apps Script 웹앱 내부에서 실행 중입니다.\n별도의 URL 입력 없이 자동으로 스프레드시트와 연결됩니다.');
+      } else if (url) {
+        alert('Google Apps Script URL이 저장되었습니다.\n단, 가장 안정적인 사용 방법은 GAS 웹앱 주소(/exec)로 이 프로그램을 직접 여는 것입니다.');
+      } else {
+        alert('URL을 입력하세요.');
+      }
+    }
+
+    function gasRun(functionName, ...args) {
+      return new Promise((resolve, reject) => {
+        if (!isGasHosted()) {
+          reject(new Error(
+            '현재 HTML이 Google Apps Script 웹앱 밖에서 실행되고 있습니다.\n' +
+            'GAS에서 배포한 웹앱의 /exec 주소를 브라우저로 열어 이 프로그램을 실행해주세요.'
+          ));
+          return;
+        }
+
+        let runner = google.script.run
+          .withSuccessHandler(resolve)
+          .withFailureHandler(err => {
+            reject(new Error(err && err.message ? err.message : String(err)));
+          });
+
+        runner[functionName](...args);
+      });
     }
 
     function makeElementDraggable(elmnt, header) {
@@ -732,15 +799,309 @@
       document.getElementById('formPax').value = tbody.querySelectorAll('tr').length;
     }
 
-    // --- 누락된 필수 함수들 구현 ---
-    
-    // 동행인 행 삭제 및 PAX 동기화
-    function deleteCompanionRow(btn) {
-      btn.closest('tr').remove();
-      document.getElementById('formPax').value = document.querySelectorAll('#companionTableBody tr').length;
+    // =========================
+    // 예약 데이터 / API 처리
+    // =========================
+    function normalizeReservation(raw = {}) {
+      const r = { ...raw };
+      // GAS가 내려준 실제 스프레드시트 행 번호를 보존합니다.
+      r._sheetRow = raw._sheetRow ?? raw.sheetRow ?? null;
+
+      // GAS/Sheets에서 흔히 쓰는 헤더명도 일부 허용
+      r.status = r.status ?? r.Status ?? r['상태'] ?? 'NEW';
+      r.name = r.name ?? r.reserverName ?? r['예약자명'] ?? '';
+      r.checkIn = r.checkIn ?? r.checkin ?? r['체크인'] ?? '';
+      r.checkOut = r.checkOut ?? r.checkout ?? r['체크아웃'] ?? '';
+      r.nights = Number(r.nights ?? r['박수'] ?? 0) || 0;
+      r.pax = Number(r.pax ?? r.PAX ?? r['인원수'] ?? 1) || 1;
+      r.room = Number(r.room ?? r.rooms ?? r['객실수'] ?? 1) || 1;
+      r.lift = r.lift ?? r['리프트권'] ?? '';
+      r.busIn = r.busIn ?? r['송영버스(IN)'] ?? '';
+      r.busInTime = r.busInTime ?? r['송영버스(IN)시간'] ?? '';
+      r.busOut = r.busOut ?? r['송영버스(OUT)'] ?? '';
+      r.busOutTime = r.busOutTime ?? r['송영버스(OUT)시간'] ?? '';
+      r.flightIn = r.flightIn ?? r['항공편(IN)'] ?? '';
+      r.flightInTime = r.flightInTime ?? r['항공편(IN)시간'] ?? '';
+      r.flightOut = r.flightOut ?? r['항공편(OUT)'] ?? '';
+      r.flightOutTime = r.flightOutTime ?? r['항공편(OUT)시간'] ?? '';
+      r.roomAllocation = r.roomAllocation ?? r['방배정'] ?? '';
+      r.memo = r.memo ?? r['고객 메모'] ?? '';
+      r.hotelMemo = r.hotelMemo ?? r['호텔 메모'] ?? '';
+      r.companions = Array.isArray(r.companions)
+        ? r.companions
+        : Array.isArray(r.companionList)
+          ? r.companionList
+          : [];
+      return r;
     }
 
-    // 예약 폼 모달 열기
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function statusLabel(status) {
+      const map = {
+        NEW: ['신규', 'bg-sky-100 text-sky-700'],
+        ACTIVE: ['확정', 'bg-emerald-100 text-emerald-700'],
+        UPDATED: ['수정', 'bg-indigo-100 text-indigo-700'],
+        WAITING: ['대기', 'bg-amber-100 text-amber-700'],
+        CANCELLED: ['취소', 'bg-rose-100 text-rose-700']
+      };
+      return map[status] || [status || '-', 'bg-gray-100 text-gray-700'];
+    }
+
+    function calculateNightsValue(checkIn, checkOut) {
+      if (!checkIn || !checkOut) return 0;
+      const d1 = new Date(`${checkIn}T00:00:00`);
+      const d2 = new Date(`${checkOut}T00:00:00`);
+      const diff = Math.round((d2 - d1) / 86400000);
+      return diff > 0 ? diff : 0;
+    }
+
+    function reservationToPayload(r) {
+      return {
+        action: r._isNew ? 'create' : 'update',
+        index: r._index ?? null,
+        sheetRow: r._sheetRow ?? null,
+        reservation: {
+          status: r.status,
+          name: r.name,
+          checkIn: r.checkIn,
+          checkOut: r.checkOut,
+          nights: r.nights,
+          pax: r.pax,
+          room: r.room,
+          lift: r.lift,
+          busIn: r.busIn,
+          busInTime: r.busInTime,
+          busOut: r.busOut,
+          busOutTime: r.busOutTime,
+          flightIn: r.flightIn,
+          flightInTime: r.flightInTime,
+          flightOut: r.flightOut,
+          flightOutTime: r.flightOutTime,
+          roomAllocation: r.roomAllocation,
+          memo: r.memo,
+          hotelMemo: r.hotelMemo,
+          companions: r.companions
+        }
+      };
+    }
+
+    async function apiRequest(method, payload = null) {
+      // GAS 웹앱 안에서 실행할 때는 CORS가 없는 google.script.run을 사용합니다.
+      if (isGasHosted()) {
+        if (method === 'GET') {
+          return await gasRun('getReservations');
+        }
+
+        if (method === 'POST') {
+          if (payload && payload.action === 'delete') {
+            return await gasRun('deleteReservation', payload.sheetRow, payload.index);
+          }
+          return await gasRun('saveReservation', payload);
+        }
+      }
+
+      // 외부 HTML에서 실행하는 경우의 호환용.
+      // 단, Apps Script 웹앱의 브라우저 CORS 제약 때문에 권장하지 않습니다.
+      const url = getApiUrl();
+      if (!url) {
+        throw new Error(
+          'Google Apps Script 웹앱 주소가 없습니다.\n' +
+          'GAS에서 배포한 /exec 주소를 브라우저로 열어주세요.'
+        );
+      }
+
+      const options = {
+        method,
+        redirect: 'follow',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+      };
+
+      if (payload !== null) options.body = JSON.stringify(payload);
+
+      const response = await fetch(url, options);
+      const text = await response.text();
+
+      let data;
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        throw new Error(`서버 응답이 JSON 형식이 아닙니다.\n${text.substring(0, 300)}`);
+      }
+
+      if (!response.ok) {
+        throw new Error(data.message || `HTTP ${response.status}`);
+      }
+
+      if (data.success === false) {
+        throw new Error(data.message || 'Google Apps Script에서 오류를 반환했습니다.');
+      }
+
+      return data;
+    }
+
+    // =========================
+    // 화면 렌더링
+    // =========================
+    function renderReservations() {
+      const tbody = document.getElementById('reservationTableBody');
+
+      if (!reservations.length) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="11" class="p-8 text-center text-gray-400">
+              데이터가 없습니다.
+            </td>
+          </tr>`;
+        updateCounters();
+        renderBusSummary();
+        return;
+      }
+
+      tbody.innerHTML = reservations.map((raw, index) => {
+        const r = normalizeReservation(raw);
+        r._index = index;
+        const [label, cls] = statusLabel(r.status);
+
+        const busText = [
+          r.busIn ? `IN: ${r.busIn}${r.busInTime ? ` (${formatTime(r.busInTime)})` : ''}` : '',
+          r.busOut ? `OUT: ${r.busOut}${r.busOutTime ? ` (${formatTime(r.busOutTime)})` : ''}` : ''
+        ].filter(Boolean).join('<br>') || '-';
+
+        const flightText = [
+          r.flightIn ? `IN: ${r.flightIn}${r.flightInTime ? ` (${formatTime(r.flightInTime)})` : ''}` : '',
+          r.flightOut ? `OUT: ${r.flightOut}${r.flightOutTime ? ` (${formatTime(r.flightOutTime)})` : ''}` : ''
+        ].filter(Boolean).join('<br>') || '-';
+
+        return `
+          <tr class="hover:bg-slate-50">
+            <td class="py-2 px-2 text-center sticky-col-1">
+              <span class="inline-block px-2 py-1 rounded-full font-bold ${cls}">${escapeHtml(label)}</span>
+            </td>
+            <td class="py-2 px-2 sticky-col-2">
+              <div class="font-medium">${escapeHtml(formatDateForInput(r.checkIn) || '-')}</div>
+              <div class="text-gray-400">${escapeHtml(formatDateForInput(r.checkOut) || '-')} / ${r.nights || calculateNightsValue(r.checkIn, r.checkOut)}박</div>
+            </td>
+            <td class="py-2 px-2 sticky-col-3 font-bold text-gray-800">${escapeHtml(r.name || '-')}</td>
+            <td class="py-2 px-2 text-center">${r.pax || 0}명 / ${r.room || 0}실</td>
+            <td class="py-2 px-2 leading-5">${busText}</td>
+            <td class="py-2 px-2 leading-5">${flightText}</td>
+            <td class="py-2 px-2">${escapeHtml(r.roomAllocation || '-')}</td>
+            <td class="py-2 px-2">${escapeHtml(r.memo || '-')}</td>
+            <td class="py-2 px-2">${escapeHtml(r.hotelMemo || '-')}</td>
+            <td class="py-2 px-2 text-center">
+              <button type="button" onclick="viewReservation(${index})"
+                class="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded text-slate-700">
+                보기
+              </button>
+            </td>
+            <td class="py-2 px-2 text-center whitespace-nowrap">
+              <button type="button" onclick="openModal(${index})"
+                class="px-2 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded mr-1">수정</button>
+              <button type="button" onclick="deleteReservation(${index})"
+                class="px-2 py-1 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded">삭제</button>
+            </td>
+          </tr>`;
+      }).join('');
+
+      updateCounters();
+      renderBusSummary();
+    }
+
+    function updateCounters() {
+      const counts = { NEW: 0, ACTIVE: 0, UPDATED: 0, WAITING: 0, CANCELLED: 0 };
+      reservations.forEach(r => {
+        const status = normalizeReservation(r).status;
+        if (counts[status] !== undefined) counts[status]++;
+      });
+      document.getElementById('newCount').textContent = `${counts.NEW}건`;
+      document.getElementById('activeCount').textContent = `${counts.ACTIVE}건`;
+      document.getElementById('updatedCount').textContent = `${counts.UPDATED}건`;
+      document.getElementById('waitingCount').textContent = `${counts.WAITING}건`;
+      document.getElementById('cancelledCount').textContent = `${counts.CANCELLED}건`;
+    }
+
+    function renderBusSummary() {
+      const container = document.getElementById('busSummaryList');
+      const map = {};
+
+      reservations.forEach((raw, index) => {
+        const r = normalizeReservation(raw);
+        const add = (date, bus, direction) => {
+          if (!date || !bus) return;
+          const key = `${date}|${direction}|${bus}`;
+          if (!map[key]) map[key] = { date, bus, direction, pax: 0, reservations: [] };
+          map[key].pax += Number(r.pax) || 0;
+          map[key].reservations.push(index);
+        };
+        add(formatDateForInput(r.checkIn), r.busIn, 'IN');
+        add(formatDateForInput(r.checkOut), r.busOut, 'OUT');
+      });
+
+      busMapGlobal = map;
+      const items = Object.values(map).sort((a, b) =>
+        `${a.date}${a.direction}${a.bus}`.localeCompare(`${b.date}${b.direction}${b.bus}`)
+      );
+
+      if (!items.length) {
+        container.innerHTML = `<div class="col-span-full text-center text-gray-400 py-3">버스 집계 데이터가 없습니다.</div>`;
+        return;
+      }
+
+      container.innerHTML = items.map(item => {
+        const key = `${item.date}|${item.direction}|${item.bus}`;
+        return `
+          <button type="button" onclick="showBusPassengers(${JSON.stringify(key)})"
+            class="text-left p-2 bg-white border rounded hover:border-blue-400 hover:shadow-sm transition">
+            <div class="font-bold text-slate-700">${escapeHtml(item.date)} · ${escapeHtml(item.direction)}</div>
+            <div class="text-blue-700 font-semibold">${escapeHtml(item.bus)}</div>
+            <div class="text-gray-500 mt-0.5">${item.pax}명</div>
+          </button>`;
+      }).join('');
+    }
+
+    // =========================
+    // 모달
+    // =========================
+    function fillFormFromReservation(raw) {
+      const r = normalizeReservation(raw);
+
+      document.getElementById('formStatus').value = r.status || 'NEW';
+      document.getElementById('formName').value = r.name || '';
+      document.getElementById('formCheckIn').value = formatDateForInput(r.checkIn);
+      document.getElementById('formCheckOut').value = formatDateForInput(r.checkOut);
+      document.getElementById('formNights').value = r.nights || calculateNightsValue(r.checkIn, r.checkOut);
+      document.getElementById('formPax').value = r.pax || 1;
+      document.getElementById('formRoom').value = r.room || 1;
+      document.getElementById('formLift').value = r.lift || '';
+      document.getElementById('formBusIn').value = r.busIn || '';
+      document.getElementById('formBusInTime').value = formatTime(r.busInTime);
+      document.getElementById('formBusOut').value = r.busOut || '';
+      document.getElementById('formBusOutTime').value = formatTime(r.busOutTime);
+      document.getElementById('formFlightIn').value = r.flightIn || '';
+      document.getElementById('formFlightInTime').value = formatTime(r.flightInTime);
+      document.getElementById('formFlightOut').value = r.flightOut || '';
+      document.getElementById('formFlightOutTime').value = formatTime(r.flightOutTime);
+      document.getElementById('formRoomAllocation').value = r.roomAllocation || '';
+      document.getElementById('formMemo').value = r.memo || '';
+      document.getElementById('formHotelMemo').value = r.hotelMemo || '';
+
+      const tbody = document.getElementById('companionTableBody');
+      tbody.innerHTML = '';
+      const companions = r.companions.length ? r.companions : [{}];
+      companions.forEach(c => addCompanionRow(c));
+      document.getElementById('formPax').value = r.pax || companions.length || 1;
+      updateCompanionRoomOptions();
+      calcNights();
+    }
+
     function openModal(index) {
       const modal = document.getElementById('resModal');
       modal.classList.remove('hidden');
@@ -748,25 +1109,64 @@
       document.getElementById('editIndex').value = index;
 
       if (index === -1) {
-        document.getElementById('modalTitle').innerHTML = '신규 예약 등록';
+        document.getElementById('modalTitle').textContent = '신규 예약 등록';
         document.getElementById('resForm').reset();
         document.getElementById('formStatus').value = 'NEW';
+        document.getElementById('formPax').value = 1;
+        document.getElementById('formRoom').value = 1;
         document.getElementById('companionTableBody').innerHTML = '';
-        addCompanionRow(); // 기본 1행 추가
+        addCompanionRow();
       } else {
-        document.getElementById('modalTitle').innerHTML = '예약 정보 수정';
-        // 실제 데이터가 연동될 경우 여기에 reservations[index] 기반 렌더링 로직 추가
+        document.getElementById('modalTitle').textContent = '예약 정보 수정';
+        fillFormFromReservation(reservations[index]);
       }
     }
 
-    // 예약 폼 모달 닫기
     function closeModal() {
       const modal = document.getElementById('resModal');
       modal.classList.add('hidden');
       modal.classList.remove('flex');
     }
 
-    // 상세보기 모달 닫기
+    function viewReservation(index) {
+      const r = normalizeReservation(reservations[index]);
+      currentViewingReservation = r;
+
+      document.getElementById('viewModalContent').innerHTML = `
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+          <div><div class="text-gray-400">상태</div><div class="font-bold">${escapeHtml(r.status)}</div></div>
+          <div><div class="text-gray-400">예약자</div><div class="font-bold">${escapeHtml(r.name)}</div></div>
+          <div><div class="text-gray-400">체크인</div><div>${escapeHtml(formatDateForInput(r.checkIn))}</div></div>
+          <div><div class="text-gray-400">체크아웃</div><div>${escapeHtml(formatDateForInput(r.checkOut))}</div></div>
+          <div><div class="text-gray-400">인원/객실</div><div>${r.pax}명 / ${r.room}실</div></div>
+          <div><div class="text-gray-400">방배정</div><div>${escapeHtml(r.roomAllocation || '-')}</div></div>
+          <div><div class="text-gray-400">IN 버스</div><div>${escapeHtml(r.busIn || '-')} ${escapeHtml(formatTime(r.busInTime))}</div></div>
+          <div><div class="text-gray-400">OUT 버스</div><div>${escapeHtml(r.busOut || '-')} ${escapeHtml(formatTime(r.busOutTime))}</div></div>
+          <div><div class="text-gray-400">IN 항공</div><div>${escapeHtml(r.flightIn || '-')} ${escapeHtml(formatTime(r.flightInTime))}</div></div>
+          <div><div class="text-gray-400">OUT 항공</div><div>${escapeHtml(r.flightOut || '-')} ${escapeHtml(formatTime(r.flightOutTime))}</div></div>
+          <div class="md:col-span-2"><div class="text-gray-400">고객 메모</div><div>${escapeHtml(r.memo || '-')}</div></div>
+          <div class="md:col-span-2"><div class="text-gray-400">호텔 메모</div><div>${escapeHtml(r.hotelMemo || '-')}</div></div>
+        </div>`;
+
+      const tbody = document.getElementById('viewCompanionTableBody');
+      tbody.innerHTML = r.companions.length
+        ? r.companions.map(c => `
+          <tr>
+            <td class="p-2 border-r">${escapeHtml(c.name || '')}</td>
+            <td class="p-2 text-center border-r">${escapeHtml(c.gender || '')}</td>
+            <td class="p-2 border-r">${escapeHtml(c.room || '')}</td>
+            <td class="p-2 text-center border-r">${c.isChild ? 'O' : ''}</td>
+            <td class="p-2 border-r">${escapeHtml(formatDateForInput(c.birth) || '')}</td>
+            <td class="p-2 border-r">${escapeHtml(c.passport || '')}</td>
+            <td class="p-2">${escapeHtml(formatDateForInput(c.passportExpiry) || '')}</td>
+          </tr>`).join('')
+        : `<tr><td colspan="7" class="p-4 text-center text-gray-400">동행인이 없습니다.</td></tr>`;
+
+      const modal = document.getElementById('viewModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
     function closeViewModal() {
       const modal = document.getElementById('viewModal');
       modal.classList.add('hidden');
@@ -774,37 +1174,239 @@
       currentViewingReservation = null;
     }
 
-    // 버스 탑승자 목록 모달 닫기
+    function showBusPassengers(key) {
+      const item = busMapGlobal[key];
+      if (!item) return;
+
+      document.getElementById('busModalTitle').innerHTML =
+        `<i class="fa-solid fa-bus text-blue-400"></i> ${escapeHtml(item.bus)}`;
+      document.getElementById('busModalSubTitle').textContent =
+        `${item.date} · ${item.direction} · ${item.pax}명`;
+
+      const passengers = [];
+      item.reservations.forEach(index => {
+        const r = normalizeReservation(reservations[index]);
+        if (r.companions.length) {
+          r.companions.forEach(c => passengers.push({
+            name: c.name || r.name,
+            pax: 1
+          }));
+        } else {
+          passengers.push({ name: r.name, pax: r.pax });
+        }
+      });
+
+      document.getElementById('busPassengerList').innerHTML =
+        passengers.map((p, i) => `
+          <li class="py-2 flex justify-between">
+            <span>${i + 1}. ${escapeHtml(p.name || '-')}</span>
+            <span class="text-gray-400">${p.pax > 1 ? `${p.pax}명` : ''}</span>
+          </li>`).join('');
+
+      const modal = document.getElementById('busPassengerModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
     function closeBusModal() {
       const modal = document.getElementById('busPassengerModal');
       modal.classList.add('hidden');
       modal.classList.remove('flex');
     }
 
-    // 데이터 불러오기 로직 (더미)
+    // =========================
+    // 동행인
+    // =========================
+    function deleteCompanionRow(btn) {
+      const row = btn.closest('tr');
+      if (row) row.remove();
+      const count = document.querySelectorAll('#companionTableBody tr').length;
+      document.getElementById('formPax').value = Math.max(1, count);
+    }
+
+    function collectCompanions() {
+      return [...document.querySelectorAll('#companionTableBody tr')].map(tr => ({
+        name: tr.querySelector('.companion-name')?.value.trim() || '',
+        gender: tr.querySelector('.companion-gender')?.value || '',
+        room: tr.querySelector('.companion-room')?.value || '',
+        isChild: !!tr.querySelector('.companion-child')?.checked,
+        birth: tr.querySelector('.companion-birth')?.value || '',
+        passport: tr.querySelector('.companion-passport')?.value.trim() || '',
+        passportExpiry: tr.querySelector('.companion-expiry')?.value || ''
+      }));
+    }
+
+    // =========================
+    // CRUD
+    // =========================
     async function loadData() {
       const url = getApiUrl();
-      if (!url) {
-        alert("Google Apps Script URL을 먼저 저장해주세요.");
+
+      if (!isGasHosted() && !url) {
+        setConnectionStatus('GAS 웹앱 /exec 주소로 열어주세요.', 'error');
+        alert("Google Apps Script 웹앱의 /exec 주소를 브라우저에서 직접 열어주세요.");
         return;
       }
-      // 실제 Fetch 또는 GAS 호출 로직 추가 부분
-      alert("입력하신 URL을 통해 데이터 불러오기를 시도합니다.");
+
+      try {
+        setConnectionStatus('GAS 연결 확인 중...', 'info');
+
+        // GAS 웹앱 내부에서는 먼저 서버 연결 자체를 확인합니다.
+        if (isGasHosted()) {
+          const test = await gasRun('testConnection');
+          if (!test || test.success !== true) {
+            throw new Error('스프레드시트 연결 테스트 결과가 정상적이지 않습니다.');
+          }
+          setConnectionStatus(
+            `연결 성공 · ${test.spreadsheetName} / ${test.sheetName} · ${Math.max(0, Number(test.lastRow || 0) - 1)}건 확인`,
+            'ok'
+          );
+        }
+
+        const data = await apiRequest('GET');
+        console.log('getReservations 결과:', data);
+
+        const rows = Array.isArray(data) ? data
+          : Array.isArray(data?.data) ? data.data
+          : Array.isArray(data?.reservations) ? data.reservations
+          : [];
+
+        reservations = rows.map(normalizeReservation);
+        renderReservations();
+
+        if (!rows.length) {
+          setConnectionStatus('스프레드시트 연결은 성공했지만 예약 데이터가 0건입니다.', 'error');
+          alert('스프레드시트 연결은 성공했지만 예약 데이터가 0건입니다.');
+          return;
+        }
+
+        setConnectionStatus(`연결 성공 · 예약 ${rows.length}건을 불러왔습니다.`, 'ok');
+      } catch (error) {
+        console.error('loadData 오류:', error);
+        setConnectionStatus(`데이터 불러오기 실패: ${error.message || error}`, 'error');
+        alert(`데이터 불러오기 실패\\n\\n${error.message || error}`);
+      }
     }
 
-    // 저장 폼 서브밋 이벤트 핸들링
-    function handleFormSubmit(e) {
+    async function handleFormSubmit(e) {
       e.preventDefault();
-      // 폼 데이터를 JSON으로 파싱 후 GAS로 전송하는 로직 추가 부분
-      alert("예약 정보 저장을 요청했습니다.");
-      closeModal();
+
+      const index = Number(document.getElementById('editIndex').value);
+      const existing = index >= 0 ? normalizeReservation(reservations[index]) : {};
+      const companions = collectCompanions();
+
+      const reservation = {
+        ...existing,
+        status: document.getElementById('formStatus').value,
+        name: document.getElementById('formName').value.trim(),
+        checkIn: document.getElementById('formCheckIn').value,
+        checkOut: document.getElementById('formCheckOut').value,
+        nights: calculateNightsValue(
+          document.getElementById('formCheckIn').value,
+          document.getElementById('formCheckOut').value
+        ),
+        pax: Math.max(1, Number(document.getElementById('formPax').value) || 1),
+        room: Math.max(1, Number(document.getElementById('formRoom').value) || 1),
+        lift: document.getElementById('formLift').value.trim(),
+        busIn: document.getElementById('formBusIn').value,
+        busInTime: document.getElementById('formBusInTime').value,
+        busOut: document.getElementById('formBusOut').value,
+        busOutTime: document.getElementById('formBusOutTime').value,
+        flightIn: document.getElementById('formFlightIn').value,
+        flightInTime: document.getElementById('formFlightInTime').value,
+        flightOut: document.getElementById('formFlightOut').value,
+        flightOutTime: document.getElementById('formFlightOutTime').value,
+        roomAllocation: document.getElementById('formRoomAllocation').value.trim(),
+        memo: document.getElementById('formMemo').value.trim(),
+        hotelMemo: document.getElementById('formHotelMemo').value.trim(),
+        companions
+      };
+
+      if (!reservation.name || !reservation.checkIn || !reservation.checkOut) {
+        alert('예약자명, 체크인, 체크아웃은 필수입니다.');
+        return;
+      }
+
+      const btn = document.getElementById('btnSubmit');
+      const oldText = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = '저장 중...';
+
+      try {
+        const payload = reservationToPayload({
+          ...reservation,
+          _isNew: index < 0,
+          _index: index
+        });
+
+        const result = await apiRequest('POST', payload);
+        console.log('저장 결과:', result);
+
+        alert(result.message || '예약 정보가 저장되었습니다.');
+        closeModal();
+        await loadData();
+      } catch (error) {
+        console.error(error);
+        alert(`저장 실패\n\n${error.message}`);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = oldText;
+      }
     }
 
-    // 엑셀 다운로드 로직 (SheetJS 활용 예시)
-    function exportCompanionsToExcel() {
-      alert("동행자 명단을 엑셀 파일로 다운로드합니다.");
-      // 추후 XLSX.utils.json_to_sheet() 등을 사용하여 엑셀 추출 로직 구현
+    async function deleteReservation(index) {
+      const r = normalizeReservation(reservations[index]);
+      if (!confirm(`"${r.name}" 예약을 삭제하시겠습니까?`)) return;
+
+      try {
+        await apiRequest('POST', {
+          action: 'delete',
+          index,
+          sheetRow: r._sheetRow,
+          reservation: r
+        });
+        alert('예약이 삭제되었습니다.');
+        await loadData();
+      } catch (error) {
+        console.error(error);
+        alert(`삭제 실패\n\n${error.message}`);
+      }
     }
+
+    // =========================
+    // 엑셀
+    // =========================
+    function exportCompanionsToExcel() {
+      if (!currentViewingReservation) {
+        alert('상세보기에서 예약을 먼저 선택해주세요.');
+        return;
+      }
+
+      const r = normalizeReservation(currentViewingReservation);
+      const rows = r.companions.map(c => ({
+        예약자명: r.name,
+        체크인: formatDateForInput(r.checkIn),
+        체크아웃: formatDateForInput(r.checkOut),
+        이름: c.name || '',
+        성별: c.gender === 'M' ? '남' : c.gender === 'F' ? '여' : '',
+        방배정: c.room || '',
+        소아: c.isChild ? 'O' : '',
+        생년월일: formatDateForInput(c.birth),
+        여권번호: c.passport || '',
+        여권유효기간: formatDateForInput(c.passportExpiry)
+      }));
+
+      if (!rows.length) {
+        alert('다운로드할 동행인 데이터가 없습니다.');
+        return;
+      }
+
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, '동행인');
+      XLSX.writeFile(wb, `동행인_${r.name || '예약자'}_${formatDateForInput(r.checkIn) || ''}.xlsx`);
+    }
+
   </script>
 </body>
 </html>
