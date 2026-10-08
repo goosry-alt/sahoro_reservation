@@ -60,6 +60,7 @@
     <div class="max-w-7xl mx-auto px-4 py-4 flex flex-wrap justify-between items-center gap-4">
       <h1 class="text-xl font-bold flex items-center gap-2">
         <i class="fa-solid fa-hotel"></i> 사호로리조트 예약현황 관리
+        <span id="appVersion" class="text-[10px] font-normal bg-slate-700 px-2 py-1 rounded">FINAL-2026-10-08</span>
       </h1>
 
       <div class="flex items-center gap-2 flex-grow max-w-xl">
@@ -80,6 +81,10 @@
       </div>
     </div>
   </header>
+
+  <div id="connectionStatus" class="max-w-7xl mx-auto px-4 pt-3 text-xs">
+    <div class="bg-white border rounded px-3 py-2 text-slate-500">연결 확인 중...</div>
+  </div>
 
   <!-- Main Content -->
   <main class="max-w-7xl mx-auto px-4 py-6 space-y-6">
@@ -500,27 +505,41 @@
 
     window.addEventListener('DOMContentLoaded', () => {
       const savedUrl = localStorage.getItem('scriptApiUrl');
-      if (savedUrl) {
-        document.getElementById('scriptUrl').value = savedUrl;
-      }
+      const urlInput = document.getElementById('scriptUrl');
 
       if (isGasHosted()) {
-        const urlInput = document.getElementById('scriptUrl');
         urlInput.value = 'GAS 웹앱 내부 연결 사용 중';
         urlInput.disabled = true;
         urlInput.title = '현재 Google Apps Script 웹앱과 직접 연결되어 있습니다.';
+      } else if (savedUrl) {
+        urlInput.value = savedUrl;
       }
 
       makeElementDraggable(document.getElementById('resModalContainer'), document.getElementById('resModalHeader'));
       makeElementDraggable(document.getElementById('viewModalContainer'), document.getElementById('viewModalHeader'));
 
-      // GAS 웹앱으로 열었으면 URL과 무관하게 자동으로 데이터를 불러옵니다.
+      setConnectionStatus(isGasHosted()
+        ? 'GAS 웹앱 내부 연결 감지됨 — 스프레드시트 연결을 확인하는 중...'
+        : 'GAS 웹앱이 아닌 일반 HTML로 열려 있습니다. /exec 주소로 열어주세요.',
+        isGasHosted() ? 'info' : 'error');
+
       if (isGasHosted()) {
         setTimeout(() => loadData(), 150);
       } else if (savedUrl) {
         loadData();
       }
     });
+
+    function setConnectionStatus(message, type = 'info') {
+      const el = document.getElementById('connectionStatus');
+      if (!el) return;
+      const cls = type === 'ok'
+        ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
+        : type === 'error'
+          ? 'bg-rose-50 border-rose-300 text-rose-700'
+          : 'bg-amber-50 border-amber-300 text-amber-700';
+      el.innerHTML = `<div class="border rounded px-3 py-2 ${cls}">${escapeHtml(message)}</div>`;
+    }
 
     function isGasHosted() {
       return typeof google !== 'undefined' &&
@@ -1223,29 +1242,49 @@
     async function loadData() {
       const url = getApiUrl();
 
-      // GAS 웹앱 내부에서는 URL 입력값이 필요 없습니다.
-      // google.script.run으로 현재 Apps Script 프로젝트의 서버 함수를 직접 호출합니다.
       if (!isGasHosted() && !url) {
-        alert("Google Apps Script URL을 먼저 저장해주세요.");
+        setConnectionStatus('GAS 웹앱 /exec 주소로 열어주세요.', 'error');
+        alert("Google Apps Script 웹앱의 /exec 주소를 브라우저에서 직접 열어주세요.");
         return;
       }
 
       try {
+        setConnectionStatus('GAS 연결 확인 중...', 'info');
+
+        // GAS 웹앱 내부에서는 먼저 서버 연결 자체를 확인합니다.
+        if (isGasHosted()) {
+          const test = await gasRun('testConnection');
+          if (!test || test.success !== true) {
+            throw new Error('스프레드시트 연결 테스트 결과가 정상적이지 않습니다.');
+          }
+          setConnectionStatus(
+            `연결 성공 · ${test.spreadsheetName} / ${test.sheetName} · ${Math.max(0, Number(test.lastRow || 0) - 1)}건 확인`,
+            'ok'
+          );
+        }
+
         const data = await apiRequest('GET');
+        console.log('getReservations 결과:', data);
+
         const rows = Array.isArray(data) ? data
-          : Array.isArray(data.data) ? data.data
-          : Array.isArray(data.reservations) ? data.reservations
+          : Array.isArray(data?.data) ? data.data
+          : Array.isArray(data?.reservations) ? data.reservations
           : [];
 
         reservations = rows.map(normalizeReservation);
         renderReservations();
 
         if (!rows.length) {
-          alert('서버에서 예약 데이터를 찾지 못했습니다. GAS의 GET 응답 형식을 확인해주세요.');
+          setConnectionStatus('스프레드시트 연결은 성공했지만 예약 데이터가 0건입니다.', 'error');
+          alert('스프레드시트 연결은 성공했지만 예약 데이터가 0건입니다.');
+          return;
         }
+
+        setConnectionStatus(`연결 성공 · 예약 ${rows.length}건을 불러왔습니다.`, 'ok');
       } catch (error) {
-        console.error(error);
-        alert(`데이터 불러오기 실패\n\n${error.message}`);
+        console.error('loadData 오류:', error);
+        setConnectionStatus(`데이터 불러오기 실패: ${error.message || error}`, 'error');
+        alert(`데이터 불러오기 실패\\n\\n${error.message || error}`);
       }
     }
 
