@@ -207,4 +207,604 @@
 
   <!-- 버스 탑승자 목록 모달 팝업 -->
   <div id="busPassengerModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50">
-    <div class="bg-white rounded-xl shadow
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
+      <div class="bg-slate-800 text-white px-5 py-3 flex justify-between items-center">
+        <h3 id="busModalTitle" class="text-sm font-bold flex items-center gap-2">
+          <i class="fa-solid fa-bus text-blue-400"></i> 버스 탑승 명단
+        </h3>
+        <button type="button" onclick="closeBusModal()" class="text-gray-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+      <div class="p-4 space-y-3">
+        <div id="busModalSubTitle" class="text-xs text-slate-500 font-medium pb-2 border-b"></div>
+        <div class="max-h-60 overflow-y-auto">
+          <ul id="busPassengerList" class="divide-y divide-gray-100 text-xs">
+            <!-- 동적 탑승자 명단 -->
+          </ul>
+        </div>
+      </div>
+      <div class="bg-gray-50 px-4 py-2 border-t text-right">
+        <button type="button" onclick="closeBusModal()" class="px-3 py-1.5 text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 rounded font-medium">닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reservation Form Modal (예약수정창) -->
+  <div id="resModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50 overflow-y-auto">
+    <div id="resModalContainer" class="bg-white rounded-xl shadow-2xl w-full max-w-5xl my-8 overflow-hidden relative">
+      <div id="resModalHeader" class="bg-slate-800 text-white px-6 py-4 flex justify-between items-center draggable-header">
+        <h3 id="modalTitle" class="text-lg font-bold">예약 정보 수정</h3>
+        <button type="button" onclick="closeModal()" class="text-gray-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+      </div>
+
+      <form id="resForm" onsubmit="handleFormSubmit(event)" class="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
+        <input type="hidden" id="editIndex" value="-1">
+
+        <!-- 기본 정보 -->
+        <div>
+          <h4 class="font-semibold text-gray-700 border-b pb-2 mb-3 text-sm flex items-center gap-2">
+            <i class="fa-solid fa-user text-blue-600"></i> 기본 정보
+          </h4>
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <label class="block text-xs font-bold text-gray-600 mb-1">상태</label>
+              <select id="formStatus" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500 font-medium">
+                <option value="NEW">신규 (NEW)</option>
+                <option value="ACTIVE">확정 (ACTIVE)</option>
+                <option value="UPDATED">수정 (UPDATED)</option>
+                <option value="WAITING">대기 (WAITING)</option>
+                <option value="CANCELLED">취소 (CANCELLED)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-gray-600 mb-1">예약자명 *</label>
+              <input type="text" id="formName" required class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-gray-600 mb-1">체크인 (출발일) *</label>
+              <input type="date" id="formCheckIn" required onchange="onCheckInChange()" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-gray-600 mb-1">체크아웃 *</label>
+              <input type="date" id="formCheckOut" required onchange="calcNights()" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-gray-600 mb-1">박수</label>
+              <input type="number" id="formNights" min="0" value="0" readonly class="w-full text-xs p-2 border bg-gray-100 rounded">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-gray-600 mb-1">인원수 (PAX)</label>
+              <input type="number" id="formPax" min="1" value="1" oninput="updateCompanionsByPax()" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-gray-600 mb-1">객실수</label>
+              <input type="number" id="formRoom" min="1" value="1" oninput="updateCompanionRoomOptions()" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-gray-600 mb-1">리프트권</label>
+              <input type="text" id="formLift" placeholder="예: 3일권" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+            </div>
+          </div>
+        </div>
+
+        <!-- 교통 및 일정 정보 -->
+        <div>
+          <h4 class="font-semibold text-gray-700 border-b pb-2 mb-3 text-sm flex items-center gap-2">
+            <i class="fa-solid fa-plane text-blue-600"></i> 교통 및 일정 정보
+          </h4>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+            <!-- 송영버스 IN & 시각 -->
+            <div class="grid grid-cols-3 gap-2">
+              <div class="col-span-2">
+                <label class="block text-xs font-bold text-gray-600 mb-1">송영 버스 (IN)</label>
+                <select id="formBusIn" onchange="onBusInChange()" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+                  <option value="">-- 선택 없음 --</option>
+                  <option value="サホロEXP SAH03">サホロEXP SAH03</option>
+                  <option value="サホロEXP SAH07">サホロEXP SAH07</option>
+                  <option value="OBIHIRO">OBIHIRO</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-gray-600 mb-1">공항출발시각</label>
+                <input type="time" id="formBusInTime" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+              </div>
+            </div>
+
+            <!-- 송영버스 OUT & 시각 -->
+            <div class="grid grid-cols-3 gap-2">
+              <div class="col-span-2">
+                <label class="block text-xs font-bold text-gray-600 mb-1">송영 버스 (OUT)</label>
+                <select id="formBusOut" onchange="onBusOutChange()" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+                  <option value="">-- 선택 없음 --</option>
+                  <option value="サホロEXP SAH06">サホロEXP SAH06</option>
+                  <option value="サホロEXP SAH10">サホロEXP SAH10</option>
+                  <option value="OBIHIRO">OBIHIRO</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-gray-600 mb-1">호텔출발시각</label>
+                <input type="time" id="formBusOutTime" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+              </div>
+            </div>
+
+            <!-- 항공편 IN & 시각 -->
+            <div class="grid grid-cols-3 gap-2">
+              <div class="col-span-2">
+                <label class="block text-xs font-bold text-gray-600 mb-1">항공편 (IN)</label>
+                <select id="formFlightIn" onchange="onFlightInChange()" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+                  <option value="">-- 선택 없음 --</option>
+                  <option value="OZ174">OZ174</option>
+                  <option value="KE765">KE765</option>
+                  <option value="KE769">KE769</option>
+                  <option value="TW263">TW263</option>
+                  <option value="LJ203">LJ203</option>
+                  <option value="LJ207">LJ207</option>
+                  <option value="7C1501">7C1501</option>
+                  <option value="7C1503">7C1503</option>
+                  <option value="ZE625">ZE625</option>
+                  <option value="ZE623">ZE623</option>
+                  <option value="ZE621">ZE621</option>
+                  <option value="ZE627">ZE627</option>
+                  <option value="WE531">WE531</option>
+                  <option value="YP751">YP751</option>
+                  <option value="BX523">BX523</option>
+                  <option value="TW269">TW269</option>
+                  <option value="LJ527">LJ527</option>
+                  <option value="ZE951">ZE951</option>
+                  <option value="7C1551">7C1551</option>
+                  <option value="RF352">RF352</option>
+                  <option value="RF356">RF356</option>
+                  <option value="RF354">RF354</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-gray-600 mb-1">공항도착시각</label>
+                <input type="time" id="formFlightInTime" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+              </div>
+            </div>
+
+            <!-- 항공편 OUT & 시각 -->
+            <div class="grid grid-cols-3 gap-2">
+              <div class="col-span-2">
+                <label class="block text-xs font-bold text-gray-600 mb-1">항공편 (OUT)</label>
+                <select id="formFlightOut" onchange="onFlightOutChange()" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+                  <option value="">-- 선택 없음 --</option>
+                  <option value="OZ173">OZ173</option>
+                  <option value="KE766">KE766</option>
+                  <option value="KE770">KE770</option>
+                  <option value="TW264">TW264</option>
+                  <option value="LJ204">LJ204</option>
+                  <option value="LJ208">LJ208</option>
+                  <option value="7C1502">7C1502</option>
+                  <option value="7C1054">7C1054</option>
+                  <option value="ZE626">ZE626</option>
+                  <option value="ZE624">ZE624</option>
+                  <option value="ZE622">ZE622</option>
+                  <option value="ZE628">ZE628</option>
+                  <option value="WE532">WE532</option>
+                  <option value="YP752">YP752</option>
+                  <option value="BX524">BX524</option>
+                  <option value="TW270">TW270</option>
+                  <option value="LJ528">LJ528</option>
+                  <option value="ZE952">ZE952</option>
+                  <option value="7C1552">7C1552</option>
+                  <option value="RF351">RF351</option>
+                  <option value="RF355">RF355</option>
+                  <option value="RF353">RF353</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-gray-600 mb-1">공항출발시각</label>
+                <input type="time" id="formFlightOutTime" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- 방배정 및 기타 -->
+        <div>
+          <h4 class="font-semibold text-gray-700 border-b pb-2 mb-3 text-sm flex items-center gap-2">
+            <i class="fa-solid fa-bed text-blue-600"></i> 메모 및 기타
+          </h4>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label class="block text-xs font-bold text-gray-600 mb-1">방배정 (대표)</label>
+              <input type="text" id="formRoomAllocation" placeholder="예: 301호" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-gray-600 mb-1">고객 메모</label>
+              <input type="text" id="formMemo" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-gray-600 mb-1">호텔 메모</label>
+              <input type="text" id="formHotelMemo" class="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-blue-500">
+            </div>
+          </div>
+        </div>
+
+        <!-- 동행인 명단 -->
+        <div>
+          <div class="flex justify-between items-center border-b pb-2 mb-3">
+            <h4 class="font-semibold text-gray-700 text-sm flex items-center gap-2">
+              <i class="fa-solid fa-users text-blue-600"></i> 동행인 명단
+            </h4>
+            <button type="button" onclick="addCompanionRow()" class="bg-slate-700 hover:bg-slate-800 text-white text-xs px-2.5 py-1 rounded transition">
+              + 동행인 추가
+            </button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-xs text-left">
+              <thead>
+                <tr class="bg-gray-100 border-b">
+                  <th class="p-2">이름</th>
+                  <th class="p-2 w-16 text-center">성별</th>
+                  <th class="p-2 w-24">방배정</th>
+                  <th class="p-2 w-14 text-center">어린이</th>
+                  <th class="p-2">생년월일</th>
+                  <th class="p-2">여권정보</th>
+                  <th class="p-2">유효기간</th>
+                  <th class="p-2 text-center w-12">삭제</th>
+                </tr>
+              </thead>
+              <tbody id="companionTableBody" class="divide-y divide-gray-200">
+                <!-- 동적 생성 -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="flex justify-end gap-2 pt-4 border-t">
+          <button type="button" onclick="closeModal()" class="px-4 py-2 text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 rounded font-medium">취소</button>
+          <button type="submit" id="btnSubmit" class="px-5 py-2 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded font-medium">저장하기</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    let reservations = [];
+    let busMapGlobal = {};
+    let currentViewingReservation = null;
+
+    const timeTables = {
+      busIn: {
+        "サホロEXP SAH03": "12:15",
+        "サホロEXP SAH07": "16:15",
+        "OBIHIRO": "17:00"
+      },
+      busOut: {
+        "サホロEXP SAH06": "08:20",
+        "サホロEXP SAH10": "12:30",
+        "OBIHIRO": "15:00"
+      },
+      flightIn: {
+        "OZ174": "10:45", "KE765": "12:50", "KE769": "15:40", "TW263": "13:10",
+        "LJ203": "11:15", "LJ207": "17:00", "7C1501": "10:00", "7C1503": "15:00",
+        "ZE625": "11:40", "ZE623": "17:05", "ZE621": "10:20", "ZE627": "12:55",
+        "WE531": "12:45", "YP751": "12:20", "BX523": "11:30", "TW269": "11:30",
+        "LJ527": "16:10", "ZE951": "17:00", "7C1551": "13:30", "RF352": "10:30",
+        "RF356": "16:00", "RF354": "16:15"
+      },
+      flightOut: {
+        "OZ173": "12:00", "KE766": "14:00", "KE770": "16:50", "TW264": "14:40",
+        "LJ204": "12:25", "LJ208": "18:00", "7C1502": "11:00", "7C1054": "16:00",
+        "ZE626": "13:00", "ZE624": "18:05", "ZE622": "11:20", "ZE628": "13:55",
+        "WE532": "14:05", "YP752": "13:45", "BX524": "12:30", "TW270": "12:30",
+        "LJ528": "17:10", "ZE952": "18:00", "7C1552": "14:30", "RF351": "11:30",
+        "RF355": "16:55", "RF353": "18:10"
+      }
+    };
+
+    window.addEventListener('DOMContentLoaded', () => {
+      const savedUrl = localStorage.getItem('scriptApiUrl');
+      if (savedUrl) {
+        document.getElementById('scriptUrl').value = savedUrl;
+      }
+      makeElementDraggable(document.getElementById('resModalContainer'), document.getElementById('resModalHeader'));
+      makeElementDraggable(document.getElementById('viewModalContainer'), document.getElementById('viewModalHeader'));
+    });
+
+    function getApiUrl() {
+      return document.getElementById('scriptUrl').value.trim();
+    }
+
+    function saveApiUrl() {
+      const url = getApiUrl();
+      if (!url) {
+        alert('URL을 입력하세요.');
+        return;
+      }
+      localStorage.setItem('scriptApiUrl', url);
+      alert('Google Apps Script URL이 저장되었습니다.');
+    }
+
+    function makeElementDraggable(elmnt, header) {
+      let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+      if (header) {
+        header.onmousedown = dragMouseDown;
+      } else {
+        elmnt.onmousedown = dragMouseDown;
+      }
+
+      function dragMouseDown(e) {
+        if (['INPUT', 'BUTTON', 'I', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) return;
+        e = e || window.event;
+        e.preventDefault();
+        pos3 = e.clientX;
+        pos4 = e.clientY;
+        document.onmouseup = closeDragElement;
+        document.onmousemove = elementDrag;
+      }
+
+      function elementDrag(e) {
+        e = e || window.event;
+        e.preventDefault();
+        pos1 = pos3 - e.clientX;
+        pos2 = pos4 - e.clientY;
+        pos3 = e.clientX;
+        pos4 = e.clientY;
+
+        elmnt.style.position = 'absolute';
+        elmnt.style.top = Math.max(0, (elmnt.offsetTop - pos2)) + "px";
+        elmnt.style.left = Math.max(0, (elmnt.offsetLeft - pos1)) + "px";
+      }
+
+      function closeDragElement() {
+        document.onmouseup = null;
+        document.onmousemove = null;
+      }
+    }
+
+    function formatDateForInput(dateVal) {
+      if (!dateVal) return '';
+      if (typeof dateVal === 'string' && dateVal.length >= 10 && dateVal.match(/^\d{4}-\d{2}-\d{2}/)) {
+        return dateVal.substring(0, 10);
+      }
+      const d = new Date(dateVal);
+      if (isNaN(d.getTime())) return '';
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    function formatTime(t) {
+      if (!t) return '';
+      const str = String(t).trim();
+      if (str.includes("GMT") || str.includes("1899") || str.includes("Sat") || str.includes("Sun") || str.includes("Mon") || str.includes("Tue") || str.includes("Wed") || str.includes("Thu") || str.includes("Fri")) {
+        const match = str.match(/(\d{2}):(\d{2})/);
+        if (match) return match[1] + ':' + match[2];
+      }
+      if (str.length >= 5) return str.substring(0, 5);
+      return str;
+    }
+
+    function onBusInChange() {
+      const val = document.getElementById('formBusIn').value;
+      document.getElementById('formBusInTime').value = timeTables.busIn[val] || '';
+    }
+
+    function onBusOutChange() {
+      const val = document.getElementById('formBusOut').value;
+      document.getElementById('formBusOutTime').value = timeTables.busOut[val] || '';
+    }
+
+    function onFlightInChange() {
+      const val = document.getElementById('formFlightIn').value;
+      document.getElementById('formFlightInTime').value = timeTables.flightIn[val] || '';
+    }
+
+    function onFlightOutChange() {
+      const val = document.getElementById('formFlightOut').value;
+      document.getElementById('formFlightOutTime').value = timeTables.flightOut[val] || '';
+    }
+
+    function checkChildAge(birthInput) {
+      const tr = birthInput.closest('tr');
+      if (!tr) return;
+      const childCheckbox = tr.querySelector('.companion-child');
+      if (!childCheckbox) return;
+
+      const checkInVal = document.getElementById('formCheckIn').value;
+      const birthVal = birthInput.value;
+
+      if (!checkInVal || !birthVal) return;
+
+      const checkInDate = new Date(checkInVal);
+      const birthDate = new Date(birthVal);
+
+      if (isNaN(checkInDate.getTime()) || isNaN(birthDate.getTime())) return;
+
+      let age = checkInDate.getFullYear() - birthDate.getFullYear();
+      const m = checkInDate.getMonth() - birthDate.getMonth();
+      if (m < 0 || (m === 0 && checkInDate.getDate() < birthDate.getDate())) {
+        age--;
+      }
+
+      childCheckbox.checked = (age < 12);
+    }
+
+    function onCheckInChange() {
+      calcNights();
+      const birthInputs = document.querySelectorAll('.companion-birth');
+      birthInputs.forEach(input => checkChildAge(input));
+    }
+
+    function calcNights() {
+      const checkIn = document.getElementById('formCheckIn').value;
+      const checkOut = document.getElementById('formCheckOut').value;
+      if (checkIn && checkOut) {
+        const d1 = new Date(checkIn);
+        const d2 = new Date(checkOut);
+        const diff = Math.ceil((d2 - d1) / (1000 * 60 * 60 * 24));
+        document.getElementById('formNights').value = diff > 0 ? diff : 0;
+      }
+    }
+
+    function updateCompanionRoomOptions() {
+      const roomCount = parseInt(document.getElementById('formRoom').value) || 1;
+      const roomSelects = document.querySelectorAll('.companion-room');
+
+      roomSelects.forEach(select => {
+        const currentValue = select.value;
+        select.innerHTML = '';
+
+        for (let i = 1; i <= roomCount; i++) {
+          const optVal = `Room ${i}`;
+          const opt = document.createElement('option');
+          opt.value = optVal;
+          opt.textContent = optVal;
+          select.appendChild(opt);
+        }
+
+        if (currentValue && select.querySelector(`option[value="${currentValue}"]`)) {
+          select.value = currentValue;
+        }
+      });
+    }
+
+    function updateCompanionsByPax() {
+      const pax = parseInt(document.getElementById('formPax').value) || 1;
+      const tbody = document.getElementById('companionTableBody');
+      const currentRows = tbody.querySelectorAll('tr').length;
+
+      if (pax > currentRows) {
+        for (let i = currentRows; i < pax; i++) {
+          addCompanionRow();
+        }
+      } else if (pax < currentRows && pax >= 0) {
+        const rows = tbody.querySelectorAll('tr');
+        for (let i = currentRows - 1; i >= pax; i--) {
+          rows[i].remove();
+        }
+      }
+    }
+
+    function addCompanionRow(data = {}) {
+      const tbody = document.getElementById('companionTableBody');
+      const tr = document.createElement('tr');
+      tr.className = 'hover:bg-gray-50';
+
+      const roomCount = parseInt(document.getElementById('formRoom').value) || 1;
+      let roomOptionsHtml = '';
+      for (let i = 1; i <= roomCount; i++) {
+        const rVal = `Room ${i}`;
+        const selected = (data.room === rVal) ? 'selected' : '';
+        roomOptionsHtml += `<option value="${rVal}" ${selected}>${rVal}</option>`;
+      }
+
+      tr.innerHTML = `
+        <td class="p-1.5"><input type="text" value="${data.name || ''}" placeholder="성함" class="companion-name w-full p-1 border rounded text-xs"></td>
+        <td class="p-1.5 text-center">
+          <select class="companion-gender w-full p-1 border rounded text-xs">
+            <option value="M" ${data.gender === 'M' ? 'selected' : ''}>남</option>
+            <option value="F" ${data.gender === 'F' ? 'selected' : ''}>여</option>
+          </select>
+        </td>
+        <td class="p-1.5">
+          <select class="companion-room w-full p-1 border rounded text-xs">
+            ${roomOptionsHtml}
+          </select>
+        </td>
+        <td class="p-1.5 text-center">
+          <input type="checkbox" class="companion-child" ${data.isChild ? 'checked' : ''}>
+        </td>
+        <td class="p-1.5">
+          <input type="date" value="${formatDateForInput(data.birth) || ''}" class="companion-birth w-full p-1 border rounded text-xs" onchange="checkChildAge(this)">
+        </td>
+        <td class="p-1.5">
+          <input type="text" value="${data.passport || ''}" placeholder="여권번호" class="companion-passport w-full p-1 border rounded text-xs">
+        </td>
+        <td class="p-1.5">
+          <input type="date" value="${formatDateForInput(data.passportExpiry) || ''}" class="companion-expiry w-full p-1 border rounded text-xs">
+        </td>
+        <td class="p-1.5 text-center">
+          <button type="button" onclick="deleteCompanionRow(this)" class="text-red-500 hover:text-red-700">
+            <i class="fa-solid fa-trash"></i>
+          </button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+      
+      // 행 추가 시 인원수(PAX) 동기화
+      document.getElementById('formPax').value = tbody.querySelectorAll('tr').length;
+    }
+
+    // --- 누락된 필수 함수들 구현 ---
+    
+    // 동행인 행 삭제 및 PAX 동기화
+    function deleteCompanionRow(btn) {
+      btn.closest('tr').remove();
+      document.getElementById('formPax').value = document.querySelectorAll('#companionTableBody tr').length;
+    }
+
+    // 예약 폼 모달 열기
+    function openModal(index) {
+      const modal = document.getElementById('resModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      document.getElementById('editIndex').value = index;
+
+      if (index === -1) {
+        document.getElementById('modalTitle').innerHTML = '신규 예약 등록';
+        document.getElementById('resForm').reset();
+        document.getElementById('formStatus').value = 'NEW';
+        document.getElementById('companionTableBody').innerHTML = '';
+        addCompanionRow(); // 기본 1행 추가
+      } else {
+        document.getElementById('modalTitle').innerHTML = '예약 정보 수정';
+        // 실제 데이터가 연동될 경우 여기에 reservations[index] 기반 렌더링 로직 추가
+      }
+    }
+
+    // 예약 폼 모달 닫기
+    function closeModal() {
+      const modal = document.getElementById('resModal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    // 상세보기 모달 닫기
+    function closeViewModal() {
+      const modal = document.getElementById('viewModal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+      currentViewingReservation = null;
+    }
+
+    // 버스 탑승자 목록 모달 닫기
+    function closeBusModal() {
+      const modal = document.getElementById('busPassengerModal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    // 데이터 불러오기 로직 (더미)
+    async function loadData() {
+      const url = getApiUrl();
+      if (!url) {
+        alert("Google Apps Script URL을 먼저 저장해주세요.");
+        return;
+      }
+      // 실제 Fetch 또는 GAS 호출 로직 추가 부분
+      alert("입력하신 URL을 통해 데이터 불러오기를 시도합니다.");
+    }
+
+    // 저장 폼 서브밋 이벤트 핸들링
+    function handleFormSubmit(e) {
+      e.preventDefault();
+      // 폼 데이터를 JSON으로 파싱 후 GAS로 전송하는 로직 추가 부분
+      alert("예약 정보 저장을 요청했습니다.");
+      closeModal();
+    }
+
+    // 엑셀 다운로드 로직 (SheetJS 활용 예시)
+    function exportCompanionsToExcel() {
+      alert("동행자 명단을 엑셀 파일로 다운로드합니다.");
+      // 추후 XLSX.utils.json_to_sheet() 등을 사용하여 엑셀 추출 로직 구현
+    }
+  </script>
+</body>
+</html>
